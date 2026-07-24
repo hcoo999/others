@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>무등산 하루 등산 프로젝트</title>
+    <style>
+        :root {
+            --primary-color: #2e7d32;
+            --secondary-color: #e8f5e9;
+            --text-color: #333;
+            --accent-color: #d32f2f;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.6;
+            color: var(--text-color);
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 10px;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+
+        h1 {
+            font-size: 1.4rem;
+            color: var(--primary-color);
+            text-align: center;
+            margin-top: 5px;
+            margin-bottom: 15px;
+            border-bottom: 2px solid var(--primary-color);
+            padding-bottom: 10px;
+        }
+
+        .section-title {
+            font-size: 1.1rem;
+            color: var(--primary-color);
+            border-left: 4px solid var(--primary-color);
+            padding-left: 8px;
+            margin-top: 25px;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+
+        /* 테이블 모바일 최적화 */
+        .table-container {
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            white-space: nowrap;
+            font-size: 0.85rem;
+        }
+
+        th, td {
+            padding: 12px 10px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        th {
+            background-color: var(--primary-color);
+            color: white;
+            font-weight: bold;
+            position: sticky;
+            top: 0;
+        }
+
+        /* 세부 코스 열 너비 조정 및 자동 줄바꿈 적용 */
+        td.course-detail {
+            white-space: normal;
+            min-width: 180px;
+            font-size: 0.8rem;
+            color: #555;
+        }
+
+        tr:nth-child(even) {
+            background-color: #fafafa;
+        }
+
+        .difficulty {
+            color: var(--accent-color);
+            letter-spacing: -1px;
+            font-weight: bold;
+        }
+
+        .scroll-hint {
+            text-align: right;
+            font-size: 0.75rem;
+            color: #999;
+            margin-bottom: 8px;
+        }
+
+        /* 하단 이동된 정보 영역 */
+        .bottom-info {
+            margin-top: 30px;
+            border-top: 1px dashed #ccc;
+            padding-top: 20px;
+        }
+
+        .info-box {
+            background-color: var(--secondary-color);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+
+        .info-box h2 {
+            font-size: 1rem;
+            margin-top: 0;
+            margin-bottom: 10px;
+            color: #1b5e20;
+        }
+
+        .info-box ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+
+        .info-box li {
+            margin-bottom: 5px;
+            font-size: 0.9rem;
+        }
+
+        .toilet-tip {
+            background-color: #fff3e0;
+            border-left: 4px solid #ff9800;
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+        }
+
+        .toilet-tip strong {
+            color: #e65100;
+            font-size: 0.95rem;
+        }
+
+        .route-node {
+            display: inline-block;
+            background-color: #f1f8e9;
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin: 1px 0;
+            font-size: 0.75rem;
+            border: 1px solid #dcedc8;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>무등산 하루 등산 프로젝트</h1>
+    
+    <div class="scroll-hint">좌우로 쓱 밀어서 보기 ➔</div>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>회차</th>
+                    <th>코스 및 세부 경로</th>
+                    <th>소요시간</th>
+                    <th>난이도</th>
+                    <th>볼거리</th>
+                    <th> 쉴 곳 / 전망대</th>
+                    <th>점심 추천</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>1</td>
+                    <td class="course-detail"><strong>증심사-중머리재</strong><br><span class="route-node">증심사 주차장</span> → <span class="route-node">당산나무</span> → <span class="route-node">중머리재</span> → <span class="route-node">원점회귀</span></td>
+                    <td>3시간</td>
+                    <td class="difficulty">★★</td>
+                    <td>무등산 대표 숲길</td>
+                    <td>당산나무 쉼터, 중머리재 대형 쉼터</td>
+                    <td>증심사 중앙식당</td>
+                </tr>
+                <tr>
+                    <td>2</td>
+                    <td class="course-detail"><strong>증심사-입석대 코스</strong><br><span class="route-node">증심사</span> → <span class="route-node">중머리재</span> → <span class="route-node">장불재</span> → <span class="route-node">입석대</span> → <span class="route-node">증심사</span></td>
+                    <td>4~5시간</td>
+                    <td class="difficulty">★★★</td>
+                    <td>입석대 주상절리대</td>
+                    <td>장불재 쉼터 광장, 입석대 전망대</td>
+                    <td>대호식당</td>
+                </tr>
+                <tr>
+                    <td>3</td>
+                    <td class="course-detail"><strong>증심사-서석대 코스</strong><br><span class="route-node">증심사</span> → <span class="route-node">중머리재</span> → <span class="route-node">장불재</span> → <span class="route-node">서석대</span> → <span class="route-node">증심사</span></td>
+                    <td>5시간</td>
+                    <td class="difficulty">★★★</td>
+                    <td>무등산 서석대</td>
+                    <td>장불재 쉼터, 서석대 전망대</td>
+                    <td>증심사 중앙식당</td>
+                </tr>
+                <tr>
+                    <td>4</td>
+                    <td class="course-detail"><strong>원효사-늦재-서석대</strong><br><span class="route-node">원효사</span> → <span class="route-node">늦재 삼거리</span> → <span class="route-node">바람재</span> → <span class="route-node">동화사터</span> → <span class="route-node">서석대</span></td>
+                    <td>4시간</td>
+                    <td class="difficulty">★★</td>
+                    <td>조용한 오솔길, 숲길</td>
+                    <td>늦재 쉼터, 동화사터 터터 쉼터</td>
+                    <td>대호식당</td>
+                </tr>
+                <tr>
+                    <td>5</td>
+                    <td class="course-detail"><strong>원효사-중봉-서석대</strong><br><span class="route-node">원효사</span> → <span class="route-node">늦재</span> → <span class="route-node">동화사터</span> → <span class="route-node">중봉 능선</span> → <span class="route-node">서석대</span></td>
+                    <td>5~6시간</td>
+                    <td class="difficulty">★★★</td>
+                    <td>중봉 은빛 초원 지대</td>
+                    <td>중봉 전망대 및 군부대 이전지 터</td>
+                    <td>대호식당</td>
+                </tr>
+                <tr>
+                    <td>6</td>
+                    <td class="course-detail"><strong>규봉암-장불재 코스</strong><br><span class="route-node">원효사/꼬막재</span> → <span class="route-node">규봉암</span> → <span class="route-node">장불재</span> → <span class="route-node">규봉암 원점</span></td>
+                    <td>4시간</td>
+                    <td class="difficulty">★★★</td>
+                    <td>규봉암 기암괴석 암릉</td>
+                    <td>규봉암 입구, 장불재 대형 대피소</td>
+                    <td>담양 식당 이용</td>
+                </tr>
+                <tr>
+                    <td>7</td>
+                    <td class="course-detail"><strong>화순도원마을 코스</strong><br><span class="route-node">도원탐방지원센터</span> → <span class="route-node">장불재</span> → <span class="route-node">규봉암</span> → <span class="route-node">도원마을</span></td>
+                    <td>4~5시간</td>
+                    <td class="difficulty">★★★</td>
+                    <td>화순 방향 이색 전망</td>
+                    <td>장불재 쉼터, 규봉암 전망처</td>
+                    <td>화순 백반</td>
+                </tr>
+                <tr>
+                    <td>8</td>
+                    <td class="course-detail"><strong>백마능선 철쭉 코스</strong><br><span class="route-node">수만리/둔병재</span> → <span class="route-node">안양산</span> → <span class="route-node">낙타봉</span> → <span class="route-node">장불재</span></td>
+                    <td>5~6시간</td>
+                    <td class="difficulty">★★★★</td>
+                    <td>끝없는 백마능선 조망</td>
+                    <td>안양산 정상 헬기장, 낙타봉 바위쉼터</td>
+                    <td>원효사 입구</td>
+                </tr>
+                <tr>
+                    <td>9</td>
+                    <td class="course-detail"><strong>무등산 옛길 1구간</strong><br><span class="route-node">산수동 오거리</span> → <span class="route-node">잣고개(무진고성)</span> → <span class="route-node">청풍쉼터</span> → <span class="route-node">원효사</span></td>
+                    <td>3시간</td>
+                    <td class="difficulty">★</td>
+                    <td>역사적 유적길 산책</td>
+                    <td>청풍쉼터공원, 충장사 쉼터</td>
+                    <td>원효사 입구</td>
+                </tr>
+                <tr>
+                    <td>10</td>
+                    <td class="course-detail"><strong>무등산 옛길 2구간</strong><br><span class="route-node">원효사 주차장</span> → <span class="route-node">제철유적지</span> → <span class="route-node">물통거리</span> → <span class="route-node">서석대</span></td>
+                    <td>3~4시간</td>
+                    <td class="difficulty">★★</td>
+                    <td>원시림 느낌의 옛 지름길</td>
+                    <td>치마바위 쉼터, 목교 안전쉼터</td>
+                    <td>원효사 입구</td>
+                </tr>
+                <tr>
+                    <td>11</td>
+                    <td class="course-detail"><strong>토끼등 코스</strong><br><span class="route-node">증심사 입구</span> → <span class="route-node">증심교</span> → <span class="route-node">토끼등 쉼터</span> → <span class="route-node">중머리재</span></td>
+                    <td>4시간</td>
+                    <td class="difficulty">★★★</td>
+                    <td>한적하고 부드러운 능선길</td>
+                    <td>토끼등 넓은 쉼터 및 데크 전망대</td>
+                    <td>증심사</td>
+                </tr>
+                <tr>
+                    <td>12</td>
+                    <td class="course-detail"><strong>증심계곡 힐링코스</strong><br><span class="route-node">증심사 입구</span> → <span class="route-node">증심교</span> → <span class="route-node">바람재 갈림길</span> → <span class="route-node">증심사 사찰</span></td>
+                    <td>2시간</td>
+                    <td class="difficulty">★</td>
+                    <td>수려한 계곡과 편안한 평지</td>
+                    <td>증심사 사찰 경내 쉼터, 증심교 휴식처</td>
+                    <td>증심사</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- 수정요청 사항 반영: 최하단으로 이동된 가이드 영역 -->
+    <div class="bottom-info">
+        <div class="info-box">
+            <h2>🎯 프로젝트 목표</h2>
+            <ul>
+                <li>하루 3~6시간 산행</li>
+                <li>코스별 특징 익히기</li>
+                <li>정상보다 <strong>"무등산 전체를 알아가는 것"</strong>에 집중</li>
+                <li>산행 후 광주 맛집 한 곳 방문</li>
+            </ul>
+        </div>
+
+        <div class="toilet-tip">
+            <strong>💡 화장실 이용 가이드 (산행 계획 시 참고)</strong><br>
+            • <strong>기점 화장실:</strong> 증심사 주차장 및 원효사 주차장의 상가 공중화장실을 이용할 수 있습니다. 산에 오르기 전 반드시 다녀오시는 것을 권장합니다.<br>
+            • <strong>산행 중 화장실:</strong> 산속에서는 <strong>장불재 대피소 및 목교 안전쉼터</strong>에만 친환경 화장실이 구비되어 있습니다. 중머리재, 서석대, 바람재 및 능선 구간 등에는 화장실이 전혀 없으므로 참고하시기 바랍니다.
+        </div>
+    </div>
+</div>
+
+</body>
+</html>
