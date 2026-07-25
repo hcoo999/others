@@ -4,9 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>노후 생활비 통장 · 적정 생활비 계산기</title>
-<!-- html2canvas 및 Chart.js 추가 (결과 이미지 저장 및 원형 그래프용) -->
+<!-- html2canvas, Chart.js 및 datalabels 추가 -->
 <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
 <style>
   :root{
     --teal-dark:#0e3d3c;
@@ -20,7 +21,7 @@
     --gold:#b9945a;
     --ok:#1f7a4d;
     --warn:#a4293a;
-    --info:#1565c0; /* 여유(파랑) 추가 */
+    --info:#1565c0;
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
@@ -174,7 +175,6 @@
     font-family:"Consolas","SFMono-Regular",monospace;
   }
   
-  /* type="number" 대신 text 적용하여 스피너 삭제 및 단위 잘림 해결 */
   .item-row input[type="text"].amount-input{
     width:92px;
     text-align:right;
@@ -218,7 +218,6 @@
   }
   .subtotal-line .label{ font-family:"Pretendard",sans-serif; font-size:14px; color:var(--ink-soft); font-weight:bold; }
   
-  /* 한 달 합계 폰트 키우고 강조 */
   .subtotal-line .value{ font-size:26px; font-weight:800; color:var(--stamp-red); }
 
   .calc-btn{
@@ -307,10 +306,9 @@
     line-height:1.6;
     font-weight:600;
   }
-  /* 색상 표시 조건 반영 */
-  .verdict.ok{ background:#e7f3ec; color:var(--ok); border:1px solid #b7dcc7; } /* 적정-초록 */
-  .verdict.warn{ background:#f7e9e9; color:var(--warn); border:1px solid #eec9c9; } /* 부족-빨강 */
-  .verdict.info{ background:#e3f2fd; color:var(--info); border:1px solid #90caf9; } /* 여유-파랑 */
+  .verdict.ok{ background:#e7f3ec; color:var(--ok); border:1px solid #b7dcc7; } 
+  .verdict.warn{ background:#f7e9e9; color:var(--warn); border:1px solid #eec9c9; } 
+  .verdict.info{ background:#e3f2fd; color:var(--info); border:1px solid #90caf9; } 
 
   .ref-table-wrap{
     overflow-x:auto;
@@ -339,7 +337,6 @@
   table.ref tr.highlight td{ background:#fdeee0; font-weight:700; color:var(--stamp-red); }
   .ref-note{ font-size:11px; color:var(--ink-soft); margin-top:8px; }
 
-  /* 시뮬레이션 및 제안 박스 */
   .saving-box, .sim-box{
     margin-top:18px;
     display:none;
@@ -352,11 +349,10 @@
   
   .sim-content {
     text-align: center;
-    line-height: 1.8;
+    line-height: 2.2;
     font-size: 14px;
   }
   .sim-content span { font-weight: bold; color: var(--stamp-red); }
-  .sim-arrow { color: var(--ink-soft); font-size: 12px; margin: 4px 0; }
 
   .saving-box .sb-title{
     font-size:13px; font-weight:700; color:var(--stamp-red);
@@ -385,13 +381,11 @@
     font-size:11px; color:var(--ink-soft); margin-top:6px;
   }
 
-  /* 그래프 컨테이너 */
   .chart-container {
-    max-width: 260px;
-    margin: 24px auto 10px;
+    max-width: 320px;
+    margin: 30px auto 10px;
   }
 
-  /* 하단 버튼 그룹 */
   .action-btns {
     display: flex;
     gap: 8px;
@@ -443,7 +437,7 @@
       <div class="section-title">
         <span class="num">01</span>
         <h2>기본 조건</h2>
-        <span class="sub">가구 형태와 연령대를 고르면 비교 기준이 정해져요</span>
+        <span class="sub">가구와 연령대를 선택하면 적정생활비와 비교해줍니다.</span>
       </div>
       <div class="field-row">
         <div>
@@ -456,7 +450,6 @@
         <div>
           <label for="group">비교 그룹</label>
           <select id="group">
-            <!-- 남, 여 삭제 반영 -->
             <option value="전체">전체</option>
             <option value="50-54세">50-54세</option>
             <option value="55-59세">55-59세</option>
@@ -473,8 +466,7 @@
     <section class="block">
       <div class="section-title">
         <span class="num">02</span>
-        <h2>월평균 세부 생활비 입력</h2> <!-- 텍스트 변경 -->
-        <span class="sub">한 달 기준, 단위: 만원</span>
+        <h2>월평균 세부 생활비 입력</h2>
       </div>
       <div id="itemList"></div>
       <button class="add-item" id="addItem">+ 항목 추가하기</button>
@@ -529,16 +521,14 @@
 
         <div class="verdict" id="verdict"></div>
 
-        <!-- 절약 가능액 시뮬레이션 영역 추가 -->
         <div class="sim-box" id="simBox"></div>
 
         <div class="saving-box" id="savingBox">
           <div class="sb-title">💡 적정 생활비 대비 초과분, 이렇게 조정해보세요</div>
           <div id="savingList"></div>
-          <p class="saving-note">항목별 적정 금액은 일반적인 은퇴 가구 지출 구성비(식비 25%·주거 16%·의료 13%·교통통신 12%·문화여가 10%·경조사·용돈 12%·기타 12%)를 적정 생활비 총액에 적용한 참고값입니다.</p>
+          <p class="saving-note">항목별 적정 금액은 일반적인 은퇴 가구 지출 구성비(식비 25%·주거관리비 16%·의료 13%·교통통신 12%·문화여가 10%·경조사·용돈 12%·기타 12%)를 적정 생활비 총액에 적용한 참고값입니다.</p>
         </div>
 
-        <!-- 원형 그래프 추가 영역 -->
         <div class="chart-container" id="chartContainer" style="display:none;">
           <canvas id="expenseChart"></canvas>
         </div>
@@ -548,7 +538,7 @@
     <section class="block">
       <div class="section-title">
         <span class="num">04</span>
-        <h2>참고 — 노후 필요 최소·적정 생활비</h2> <!-- 텍스트 변경 -->
+        <h2>참고 — 노후 필요 최소·적정 생활비</h2>
         <span class="sub">(단위: 만원)</span>
       </div>
       <div class="ref-table-wrap">
@@ -569,7 +559,6 @@
       <p class="ref-note">단위: 만원 · 국민노후보장패널조사(25.12.31 발표) 〈표 Ⅳ-11〉 기준. 선택한 비교 그룹은 표에서 강조 표시됩니다.</p>
     </section>
 
-    <!-- 버튼 3종 제일 하단 배치 -->
     <div class="action-btns">
       <button id="btnReset">⭐ 초기화</button>
       <button id="btnLoad">⭐ 불러오기</button>
@@ -587,7 +576,6 @@
 </div>
 
 <script>
-// 남, 여 데이터 제거
 const REF_DATA = {
   "전체":    { min:[216.6,139.2], adequate:[298.1,197.6] },
   "50-54세": { min:[234.4,147.9], adequate:[321.1,209.7] },
@@ -600,23 +588,21 @@ const REF_DATA = {
 };
 const ROW_ORDER = ["전체","50-54세","55-59세","60-64세","65-69세","70-74세","75-79세","80세이상"];
 
-// 대출원리금 추가 (기타 바로 위 위치)
 const DEFAULT_ITEMS = [
   { name:"식비", amount:70 },
-  { name:"주거비 / 관리비", amount:40 },
+  { name:"주거관리비", amount:40 },
   { name:"의료·건강비", amount:25 },
   { name:"교통·통신비", amount:20 },
   { name:"문화·여가비", amount:20 },
   { name:"경조사비·용돈", amount:15 },
-  { name:"대출원리금", amount:0 }, // 추가됨
+  { name:"대출원리금", amount:0 }, 
   { name:"기타", amount:10 }
 ];
 
-// 유사어 인식을 위한 keywords 추가
 const CATEGORY_GUIDE = [
   { name:"식비", keywords:["식비","식사","외식","부식","마트","장보기"], pct:0.25,
     reason:"외식·배달 비중을 줄이고 집밥 위주로 조정하면 부담 없이 낮추기 좋은 항목이에요." },
-  { name:"주거비 / 관리비", keywords:["주거","관리비","월세","전세","공과금"], pct:0.16,
+  { name:"주거관리비", keywords:["주거","관리비","월세","전세","공과금"], pct:0.16,
     reason:"에너지 절약형 가전 이용이나 사용량 점검으로 관리비·공과금을 조정할 여지가 있어요." },
   { name:"의료·건강비", keywords:["의료","병원","약","건강"], pct:0.13,
     reason:"건강과 직결된 항목이라 무리하게 줄이기보다, 실손보험·정부 지원 제도를 먼저 확인해보세요." },
@@ -633,7 +619,9 @@ const CATEGORY_GUIDE = [
 let items = [];
 let chartInstance = null;
 
-// 아이콘 매핑 함수
+// ChartDataLabels 플러그인 등록
+Chart.register(ChartDataLabels);
+
 function getIcon(name) {
   if(/식비|식사|외식|부식|마트|장보기/.test(name)) return '🍚';
   if(/주거|관리비|월세|전세|공과금/.test(name)) return '🏠';
@@ -657,8 +645,7 @@ function renderItems(){
       <div class="item-icon">${getIcon(item.name)}</div>
       <input type="text" value="${item.name}" data-idx="${idx}" class="name-input" placeholder="항목명">
       <div class="amount-wrap">
-        <!-- inputmode numeric 및 정규식 제한으로 모바일 이슈 방지 -->
-        <input type="text" inputmode="numeric" pattern="[0-9]*" value="${item.amount === 0 ? '' : item.amount}" data-idx="${idx}" class="amount-input">
+        <input type="text" inputmode="numeric" pattern="[0-9]*" value="${item.amount}" data-idx="${idx}" class="amount-input">
         <span class="unit">만원</span>
       </div>
       <button class="remove-btn" data-idx="${idx}" title="삭제" ${items.length <= 1 ? 'disabled' : ''}>×</button>
@@ -676,14 +663,12 @@ function renderItems(){
   
   itemListEl.querySelectorAll(".amount-input").forEach(inp=>{
     inp.addEventListener("input", e=>{
-      // 문자, 음수, 소수점 차단 및 숫자만 추출
       let val = e.target.value.replace(/[^0-9]/g, '');
       if(val === "") {
          items[e.target.dataset.idx].amount = 0;
       } else {
          let num = parseInt(val, 10);
-         // 1천만원(1000 단위) 제한
-         if(num > 1000) num = 1000;
+         if(num > 10000) num = 10000;
          items[e.target.dataset.idx].amount = num;
          e.target.value = num;
       }
@@ -694,7 +679,7 @@ function renderItems(){
 
   itemListEl.querySelectorAll(".remove-btn").forEach(btn=>{
     btn.addEventListener("click", e=>{
-      if(items.length > 1) { // 마지막 1개 남았을때 방지 이중 체크
+      if(items.length > 1) { 
         items.splice(e.target.dataset.idx,1);
         renderItems();
         updateSubtotal();
@@ -736,17 +721,18 @@ function renderRefTable(selectedGroup){
 }
 
 function formatKoreanMoney(manwon) {
+  manwon = Math.round(manwon);
   if (manwon === 0) return "0원";
   let eok = Math.floor(manwon / 10000);
   let man = manwon % 10000;
   let str = "";
-  if (eok > 0) str += eok + "억";
+  if (eok > 0) str += eok.toLocaleString() + "억";
   if (man > 0) {
     if (eok > 0) str += " ";
     if (man % 1000 === 0) str += (man / 1000) + "천만원";
     else str += man.toLocaleString() + "만원";
   }
-  if (str === eok + "억") str += "원";
+  if (str === eok.toLocaleString() + "억") str += "원";
   return str;
 }
 
@@ -755,25 +741,70 @@ function drawChart() {
   document.getElementById('chartContainer').style.display = 'block';
   
   if (chartInstance) chartInstance.destroy();
-  
-  const labels = items.map(i => {
-      const total = updateSubtotal();
-      const pct = total > 0 ? ((i.amount / total) * 100).toFixed(0) : 0;
-      return `${i.name} ${pct}%`;
+
+  const total = updateSubtotal();
+  if(total === 0) return;
+
+  // 비중 계산 및 내림차순 정렬
+  let chartData = items.map(i => {
+      const amount = parseInt(i.amount) || 0;
+      return {
+          name: i.name,
+          amount: amount,
+          pct: total > 0 ? (amount / total) * 100 : 0
+      };
+  }).filter(i => i.amount > 0);
+
+  chartData.sort((a, b) => b.amount - a.amount);
+
+  let finalData = [];
+  let otherAmount = 0;
+  let otherPct = 0;
+
+  // 10% 이하는 '기타'로 통합
+  chartData.forEach(item => {
+      if (item.pct <= 10) {
+          otherAmount += item.amount;
+          otherPct += item.pct;
+      } else {
+          finalData.push(item);
+      }
   });
+
+  if (otherAmount > 0) {
+      finalData.push({ name: "기타", amount: otherAmount, pct: otherPct });
+  }
+
+  const labels = finalData.map(i => i.name);
+  const dataValues = finalData.map(i => i.amount);
+  const pcts = finalData.map(i => Math.round(i.pct) + '%');
   
   chartInstance = new Chart(ctx, {
       type: 'doughnut',
       data: {
           labels: labels,
           datasets: [{
-              data: items.map(i => i.amount),
+              data: dataValues,
               backgroundColor: ['#e57373', '#81c784', '#64b5f6', '#ffb74d', '#ba68c8', '#4dd0e1', '#a1887f', '#90a4ae']
           }]
       },
       options: {
           responsive: true,
-          plugins: { legend: { position: 'bottom', labels: { font: { size: 11 } } } }
+          plugins: { 
+            legend: { 
+                display: false // 원형 그래프 밖 범례 숨김
+            },
+            datalabels: {
+                color: '#ffffff',
+                font: { weight: 'bold', size: 12 },
+                formatter: (value, ctx) => {
+                    let idx = ctx.dataIndex;
+                    // 그래프 내부에 항목명과 퍼센트를 두 줄로 표시
+                    return [labels[idx], pcts[idx]]; 
+                },
+                textAlign: 'center'
+            }
+          }
       }
   });
 }
@@ -811,28 +842,22 @@ function calc(){
   
   let msg, cls, stampText;
 
-  // 색상 및 평가 로직 수정
   if(total > adequateVal){
     const gap = (total - adequateVal).toFixed(1);
     msg = `입력하신 합계가 참고 <b>적정 생활비</b> 수준을 ${gap}만원 초과했습니다. 재검토가 필요합니다.`;
     cls = "warn"; stampText = "재검토<br>필요";
     
-    // 절약 가능액 시뮬레이션 표시
     const saving = total - adequateVal;
     const yearly = saving * 12;
-    const twentyYears = yearly * 20;
+    const twentyYears = yearly * 20; 
     
     simBoxEl.innerHTML = `
       <div class="sim-content">
         현재 지출 <span>${total.toLocaleString()}만원</span><br>
-        <div class="sim-arrow">↓</div>
         적정 기준 <span>${adequateVal.toFixed(1)}만원</span><br>
-        <div class="sim-arrow">↓</div>
         매월 <span>${saving.toFixed(1)}만원</span> 절약 가능<br>
-        <div class="sim-arrow">↓</div>
         연 <span>${yearly.toFixed(1)}만원</span><br>
-        <div class="sim-arrow">↓</div>
-        20년 기준 <span>${formatKoreanMoney(twentyYears * 10000)}</span>
+        20년 기준 <span>${formatKoreanMoney(twentyYears)}</span>
       </div>
     `;
     simBoxEl.classList.add("show");
@@ -870,7 +895,6 @@ function renderSavingSuggestions(total, adequateVal){
 
   let hasSuggestion = false;
   CATEGORY_GUIDE.forEach(cat=>{
-    // 유사어(keywords)를 기반으로 항목 탐색
     const matchedItem = items.find(i => cat.keywords.some(k => i.name.includes(k)));
     if(!matchedItem) return;
     
@@ -910,7 +934,6 @@ function autoSave() {
   localStorage.setItem('retirement_budget_items', JSON.stringify(items));
 }
 
-// 하단 버튼 기능 구현
 document.getElementById("btnReset").addEventListener("click", () => {
   if(confirm("입력값을 기본값으로 초기화하시겠습니까?")) {
     items = DEFAULT_ITEMS.map(i => ({...i}));
@@ -951,7 +974,6 @@ document.getElementById("group").addEventListener("change", ()=>{
   if(document.getElementById("resultWrap").classList.contains("show")) calc();
 });
 
-// 초기화 실행
 const initialData = localStorage.getItem('retirement_budget_items');
 if(initialData) {
   items = JSON.parse(initialData);
