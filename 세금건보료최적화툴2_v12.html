@@ -1,0 +1,2044 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>인출순서설계 — 자산 인출 최적화 Engine v2.5</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style id="appStyle">
+  :root{
+    --ink:#1b2420;
+    --paper:#f6f3ea;
+    --panel:#ffffff;
+    --ledger:#0f2e2a;
+    --ledger-2:#154a41;
+    --brass:#a6803a;
+    --brass-2:#c79b4c;
+    --red:#8c3b2e;
+    --line:#d9d2bd;
+    --muted:#6b6355;
+    --good:#2f6b52;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--paper);
+    background-image:
+      repeating-linear-gradient(0deg, rgba(15,46,42,0.035) 0px, rgba(15,46,42,0.035) 1px, transparent 1px, transparent 34px);
+    color:var(--ink);
+    font-family:'Noto Sans KR', sans-serif;
+    line-height:1.5;
+    padding-bottom:80px;
+  }
+  .wrap{max-width:960px;margin:0 auto;padding:0 18px;}
+
+  header.masthead{
+    background:linear-gradient(180deg,var(--ledger) 0%, var(--ledger-2) 100%);
+    color:#eee7d2;
+    padding:38px 18px 30px;
+    border-bottom:6px solid var(--brass);
+  }
+  header.masthead .wrap{display:flex;flex-direction:column;gap:6px;}
+  .eyebrow{
+    font-family:'IBM Plex Mono',monospace;
+    letter-spacing:.14em;
+    font-size:11px;
+    text-transform:uppercase;
+    color:var(--brass-2);
+  }
+  h1{
+    font-family:'Fraunces', serif;
+    font-weight:600;
+    font-size:clamp(26px,5vw,38px);
+    margin:2px 0 4px;
+    letter-spacing:-0.01em;
+  }
+  header.masthead p{margin:0;color:#cfd6c8;font-size:14.5px;max-width:62ch;}
+
+  section{padding:30px 0 6px;}
+  .card{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:2px;
+    padding:22px 20px;
+    margin-bottom:16px;
+    box-shadow:0 1px 0 rgba(0,0,0,0.02);
+  }
+  .card h2{
+    font-family:'Fraunces', serif;
+    font-size:19px;
+    margin:0 0 4px;
+    display:flex;
+    align-items:baseline;
+    gap:10px;
+  }
+  .card h2 .num{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;
+    color:var(--brass);
+    border:1px solid var(--brass);
+    border-radius:50%;
+    width:20px;height:20px;
+    display:inline-flex;align-items:center;justify-content:center;
+    flex:none;
+  }
+  .card .sub{color:var(--muted);font-size:12.5px;margin:0 0 16px;}
+
+  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px 16px;}
+  .grid.g3{grid-template-columns:repeat(3,1fr);}
+  @media (max-width:640px){.grid,.grid.g3{grid-template-columns:1fr 1fr;}}
+
+  label{display:block;font-size:12.5px;color:var(--muted);margin-bottom:4px;}
+  input[type=number], select{
+    width:100%;
+    padding:9px 10px;
+    border:1px solid var(--line);
+    border-radius:2px;
+    background:#fffdf7;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:14px;
+    color:var(--ink);
+  }
+  input[type=number]:focus, select:focus{outline:2px solid var(--brass-2);outline-offset:0;border-color:var(--brass-2);}
+  .field{margin-bottom:2px;position:relative;}
+  .unit-suffix{position:absolute;right:10px;top:31px;font-size:11.5px;color:var(--muted);pointer-events:none;font-family:'IBM Plex Mono',monospace;}
+  .field.no-label .unit-suffix{top:12px;}
+  .toggle-row{display:flex;gap:8px;margin-top:2px;flex-wrap:wrap;}
+  .toggle-btn{
+    flex:1;
+    min-width:76px;
+    padding:9px 8px;
+    border:1px solid var(--line);
+    background:#fffdf7;
+    border-radius:2px;
+    cursor:pointer;
+    font-size:13px;
+    font-weight:500;
+    color:var(--muted);
+    transition:.12s;
+  }
+  .toggle-btn.active{
+    background:var(--ledger);
+    color:#eee7d2;
+    border-color:var(--ledger);
+  }
+  .acct-block{border-left:3px solid var(--brass-2);padding-left:14px;margin-bottom:18px;}
+  .acct-block h3{
+    font-size:14px;margin:0 0 10px;font-weight:600;
+    display:flex;align-items:center;gap:8px;color:var(--ledger);
+  }
+  .acct-block h3 .tag{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10px;background:var(--paper);border:1px solid var(--line);
+    padding:2px 6px;border-radius:10px;color:var(--muted);font-weight:400;
+  }
+  .acct-block .note-line{font-size:11.5px;color:var(--muted);margin:4px 0 12px;}
+
+  .checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--ledger);
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 8px;
+  }
+
+  .run-btn{
+    width:100%;
+    padding:16px;
+    background:var(--red);
+    color:#fbf3e6;
+    border:none;
+    border-radius:2px;
+    font-family:'Fraunces',serif;
+    font-size:18px;
+    font-weight:600;
+    letter-spacing:.02em;
+    cursor:pointer;
+    box-shadow:0 2px 0 #5e241b;
+  }
+  .run-btn:active{transform:translateY(1px);box-shadow:0 1px 0 #5e241b;}
+  .run-btn:disabled{opacity:.6;cursor:default;}
+
+  .action-row-main{display:flex;gap:12px;margin-top:20px;}
+  .save-btn{
+    flex:1;
+    padding:14px;
+    background:var(--ledger);
+    color:#eee7d2;
+    border:none;
+    border-radius:2px;
+    font-family:'Noto Sans KR',sans-serif;
+    font-size:14.5px;
+    font-weight:600;
+    cursor:pointer;
+    text-align:center;
+  }
+  .save-btn.red-btn{background:var(--red);}
+  .save-btn:disabled{opacity:.6;cursor:default;}
+
+  .action-row{display:flex;gap:10px;margin-top:12px;}
+  .sub-btn{
+    flex:1;
+    padding:10px;
+    background:#fffdf7;
+    color:var(--ledger);
+    border:1px solid var(--brass);
+    border-radius:2px;
+    font-family:'Noto Sans KR',sans-serif;
+    font-size:13.5px;
+    font-weight:600;
+    cursor:pointer;
+  }
+  .sub-btn:hover{background:#f0ebd8;}
+
+  #results{display:none;}
+  .reco{
+    background:var(--ledger);
+    color:#f4efe0;
+    border-radius:2px;
+    padding:22px 20px;
+    position:relative;
+    overflow:hidden;
+  }
+  .reco::before{
+    content:"AI INSIGHT";
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10px;
+    letter-spacing:.16em;
+    color:var(--brass-2);
+    display:block;
+    margin-bottom:10px;
+  }
+  .reco .headline{font-family:'Fraunces',serif;font-size:20px;margin:0 0 10px;line-height:1.35;}
+  .reco p{margin:0;color:#d8d3bf;font-size:14px;}
+  .reco .figs{
+    display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:16px;
+  }
+  .reco .fig{background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);padding:10px 12px;border-radius:2px;}
+  .reco .fig .k{font-size:11px;color:#b9b193;margin-bottom:3px;}
+  .reco .fig .v{font-family:'IBM Plex Mono',monospace;font-size:16px;color:#f4efe0;}
+
+  .timeline-container{display:flex;flex-direction:column;gap:10px;margin-top:12px;}
+  .timeline-item{
+    display:flex;align-items:center;background:#fffdf7;border:1px solid var(--line);
+    padding:10px 14px;border-radius:2px;border-left:5px solid var(--brass);
+  }
+  .timeline-age{font-family:'IBM Plex Mono',monospace;font-weight:700;width:120px;color:var(--ledger);font-size:14px;}
+  .timeline-desc{flex:1;font-size:13.5px;color:var(--ink);}
+
+  .ai-report{background:#ffffff;border:1px solid var(--line);padding:20px;border-radius:2px;margin-top:10px;}
+  .ai-report h3{margin-top:0;font-size:16px;color:var(--ledger);border-bottom:2px solid var(--brass);padding-bottom:6px;}
+  .ai-report ul{margin:8px 0 0;padding-left:20px;font-size:13.5px;color:var(--ink);}
+  .ai-report li{margin-bottom:8px;}
+
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th,td{padding:8px 8px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap;}
+  th:first-child,td:first-child{text-align:left;}
+  th{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10.5px;
+    text-transform:uppercase;
+    letter-spacing:.04em;
+    color:var(--muted);
+    font-weight:500;
+    border-bottom:2px solid var(--ink);
+  }
+  tr.best td{background:#f0f4ea;font-weight:600;color:var(--good);}
+  .tbl-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  .row-alt tr:nth-child(even){background:#fbf9f2;}
+
+  #detailTable th:first-child, #detailTable td:first-child{
+    position:sticky;
+    left:0;
+    z-index:2;
+    background:var(--panel);
+    box-shadow:2px 0 4px -2px rgba(0,0,0,.25);
+  }
+  #detailTable th:first-child{ z-index:3; }
+  .row-alt #detailTable tr:nth-child(even) td:first-child{ background:#fbf9f2; }
+
+  canvas{max-width:100%;}
+  .chart-wrap{margin-top:6px;}
+
+  .flag{
+    display:inline-block;font-family:'IBM Plex Mono',monospace;font-size:10.5px;
+    padding:2px 7px;border-radius:10px;margin-left:6px;
+  }
+  .flag.warn{background:#f3e3cf;color:#8a5a1f;}
+  .flag.ok{background:#e2ecdf;color:var(--good);}
+
+  .disclaimer{
+    font-size:11.5px;color:var(--muted);
+    background:#efe9d6;border:1px solid var(--line);
+    padding:12px 14px;border-radius:2px;margin-top:22px;
+  }
+  .spinner{display:none;text-align:center;padding:16px;color:var(--muted);font-size:13px;font-family:'IBM Plex Mono',monospace;}
+
+  details.hi-collapse{border:1px solid var(--line);border-radius:2px;background:#fffdf7;}
+  details.hi-collapse > summary{
+    list-style:none;cursor:pointer;padding:12px 14px;font-size:13.5px;font-weight:600;color:var(--ledger);
+    display:flex;align-items:center;gap:8px;
+  }
+  details.hi-collapse > summary::-webkit-details-marker{display:none;}
+  details.hi-collapse > summary::before{content:"▸";font-family:monospace;transition:.15s;}
+  details.hi-collapse[open] > summary::before{content:"▾";}
+  details.hi-collapse .hi-body{padding:6px 14px 16px;}
+
+  .modal-overlay{
+    position:fixed;top:0;left:0;width:100%;height:100%;
+    background:rgba(0,0,0,0.5);display:none;align-items:center;justify-content:center;z-index:1000;
+  }
+  .modal-content{
+    background:var(--panel);width:90%;max-width:600px;max-height:85vh;
+    border-radius:2px;border:1px solid var(--line);padding:24px;display:flex;flex-direction:column;
+  }
+  .modal-header{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);padding-bottom:10px;margin-bottom:14px;}
+  .modal-header h3{margin:0;font-family:'Fraunces',serif;font-size:18px;color:var(--ledger);}
+  .modal-close{background:none;border:none;font-size:18px;cursor:pointer;color:var(--muted);}
+  .modal-body{overflow-y:auto;flex:1;font-size:13.5px;}
+  .calc-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dashed var(--line);}
+  .calc-row.highlight{font-weight:600;color:var(--ledger);border-bottom:2px solid var(--ledger);}
+
+  .alert-box{
+    background:#fce8e6;border:1px solid #e0b4b0;color:#a83220;
+    padding:12px 14px;border-radius:2px;margin-bottom:14px;font-size:13px;display:none;
+  }
+
+  ::selection{background:var(--brass-2);color:#1b2420;}
+
+  .compare-cards{display:flex;flex-direction:column;gap:10px;}
+  .compare-card{
+    border:1px solid var(--line);border-radius:2px;background:#fffdf7;
+    padding:12px 14px;
+  }
+  .compare-card.best{border-color:var(--good);background:#f0f4ea;}
+  .compare-card .cc-head{
+    display:flex;align-items:center;justify-content:space-between;
+    font-weight:700;font-size:14px;color:var(--ledger);margin-bottom:8px;
+  }
+  .compare-card .cc-head .flag{margin-left:0;}
+  .compare-card .cc-row{
+    display:flex;justify-content:space-between;align-items:baseline;
+    font-size:13px;padding:4px 0;border-bottom:1px dashed var(--line);
+  }
+  .compare-card .cc-row:last-child{border-bottom:none;}
+  .compare-card .cc-row .cc-k{color:var(--muted);}
+  .compare-card .cc-row .cc-v{font-family:'IBM Plex Mono',monospace;font-weight:600;color:var(--ink);}
+  .compare-card.best .cc-row .cc-v{color:var(--good);}
+
+  /* ===== 인쇄(PDF 저장) 전용 스타일: 화면 캡처가 아닌 브라우저 인쇄 결과물을 A4 용지에 맞춤 ===== */
+  @media print{
+    @page{ size:A4; margin:14mm 12mm; }
+
+    html,body{
+      background:#fff !important;
+      background-image:none !important;
+      padding-bottom:0 !important;
+      -webkit-print-color-adjust:exact;
+      print-color-adjust:exact;
+      color-adjust:exact;
+    }
+
+    /* 실행/저장 등 화면 조작용 요소는 인쇄물에서 제외 */
+    .no-print,
+    #presetBtn, #runBtn, #spinner,
+    .action-row-main, .modal-overlay{
+      display:none !important;
+    }
+
+    header.masthead{
+      -webkit-print-color-adjust:exact; print-color-adjust:exact;
+      break-inside:avoid;
+    }
+
+    .wrap{ max-width:100% !important; padding:0 !important; }
+
+    .card, .acct-block, .chart-wrap, .compare-cards, .timeline-container{
+      break-inside:avoid;
+    }
+
+    /* 접힘(details) 항목은 인쇄 시 강제로 펼쳐서 보여줌 */
+    details.hi-collapse{ break-inside:avoid; }
+    details.hi-collapse summary{ list-style:none; }
+
+    /* 가로 스크롤 표는 인쇄 시 스크롤 대신 전체가 보이도록 처리 */
+    .tbl-scroll{ overflow:visible !important; }
+    table{ font-size:11px !important; }
+
+    canvas{ break-inside:avoid; }
+
+    a[href]:after{ content:""; }
+  }
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="wrap">
+    <span class="eyebrow">Retirement Drawdown Engine · v2.5</span>
+    <h1>자산인출 세금·건보료 최소화</h1>
+    <p>세금·건보료 최소화 위한 계좌별 인출순서 찾기</p>
+  </div>
+</header>
+
+<div class="wrap" id="captureArea">
+
+<section id="inputs">
+
+  <div id="errorAlert" class="alert-box"></div>
+
+  <div class="card">
+    <h2><span class="num">1</span>기초 정보 입력</h2>
+    <p class="sub">지역가입자 고정 · 주택/부동산등 기타재산은 계산 제외.</p>
+    <div class="grid g3">
+      <div class="field"><label>인출 시작 나이</label><input type="number" id="curAge" value="55"></div>
+      <div class="field"><label>기대 수명</label><input type="number" id="lifeExp" value="100"></div>
+      <div class="field"><label>물가상승률</label><input type="number" id="inflation" value="2.5" step="0.1"><span class="unit-suffix">%</span></div>
+    </div>
+    <div class="field" style="margin-top:12px;">
+      <label>배우자 인적공제 반영</label>
+      <div class="toggle-row">
+        <button type="button" class="toggle-btn active" data-group="spouse" data-val="Y">대상</button>
+        <button type="button" class="toggle-btn" data-group="spouse" data-val="N">공제비대상</button>
+      </div>
+    </div>
+    <div class="field" style="margin-top:12px;">
+      <label>금융소득종합과세 대상</label>
+      <div class="toggle-row">
+        <button type="button" class="toggle-btn active" data-group="fin" data-val="N">대상자</button>
+        <button type="button" class="toggle-btn" data-group="fin" data-val="Y">해당 없음(참고용)</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2><span class="num">2</span>월 필요 생활비 (세후 실수령)</h2>
+    <p class="sub">생활비, 국민연금은 매년 <b>물가상승률의 50%</b>씩 증가 가정</p>
+    <div class="grid">
+      <div class="field no-label"> <input type="number" id="monthlyNeed" value="300" step="1"><span class="unit-suffix">만원</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2><span class="num">3</span>기대수익률(공통)</h2>
+    <p class="sub">일반계좌·연금저축·IRP 모두 수익률 공통 적용.</p>
+    <div class="toggle-row" id="retPresetRow">
+      <button type="button" class="toggle-btn" data-preset="stable" data-val="3.5">안정 3.5%</button>
+      <button type="button" class="toggle-btn active" data-preset="balanced" data-val="5.0">균형 5.0%</button>
+      <button type="button" class="toggle-btn" data-preset="growth" data-val="7.5">성장 7.5%</button>
+      <button type="button" class="toggle-btn" data-preset="montecarlo" data-val="">몬테카를로</button>
+    </div>
+    <div class="grid" id="retDeterministicRow" style="margin-top:12px;">
+      <div class="field"><label>적용 수익률(%)</label><input type="number" id="retCommon" value="5.0" step="0.1"></div>
+    </div>
+    <div class="grid g3" id="retMonteCarloRow" style="margin-top:12px;display:none;">
+      <div class="field"><label>평균수익률(%)</label><input type="number" id="retMean" value="5.5" step="0.1"></div>
+      <div class="field"><label>변동성 표준편차(%)</label><input type="number" id="retStd" value="10" step="0.5"></div>
+      <div class="field"><label>시뮬레이션 횟수 (10~1000)</label><input type="number" id="mcTrials" value="150" step="10"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2><span class="num">4</span>국민연금</h2>
+    <div class="grid g3">
+      <div class="field"><label>개시 나이</label><input type="number" id="npStartAge" value="65" min="60" max="70"></div>
+      <div class="field"><label>월 예상수령액(만65세)</label><input type="number" id="npMonthly" value="100" step="1"><span class="unit-suffix">만원</span></div>
+      <div class="field"><label>수령연기(년)</label><input type="number" id="npDeferMax" value="0" min="0" max="5"></div>
+    </div>
+    <p class="sub" style="margin:8px 0 0;">연기시 증액(연 7.2%)을 반영해 비용 비교. (0=미탐색)</p>
+  </div>
+
+  <div class="card">
+    <h2><span class="num">5</span>인출시점 계좌별 자산</h2>
+
+    <div class="acct-block">
+      <h3>일반 계좌 <span class="tag">과세대상 배당/이자</span></h3>
+      <div class="grid">
+        <div class="field"><label>평가금액 (원금)</label><input type="number" id="genBal" value="20000" step="100"><span class="unit-suffix">만원</span></div>
+        <div class="field"><label>월 예상 배당금</label><input type="number" id="genDividend" value="100" step="1"><span class="unit-suffix">만원</span></div>
+      </div>
+    </div>
+
+    <div class="acct-block">
+      <h3>연금저축</h3>
+      <div class="grid">
+        <div class="field"><label>평가금액</label><input type="number" id="psBal" value="10000" step="100"><span class="unit-suffix">만원</span></div>
+        <div class="field"><label>세액공제 안받은 원금</label><input type="number" id="psNontax" value="1000" step="100"><span class="unit-suffix">만원</span></div>
+      </div>
+      <p class="note-line">'세액공제 받은 원금+운용수익'은 자동 계산.</p>
+      <label class="checkbox-label">
+        <input type="checkbox" id="psDeductPriority" checked>
+        연금저축 세액공제 금액(연간 1,500만원) 최우선 인출 적용
+      </label>
+      <p class="note-line">체크 시, 그 해 생활비 필요와 무관하게 매년 사적연금 연 1,500만원 안에서 연금저축(세액공제원금+운용수익)을 최우선으로, 잔액이 소진될 때까지추가 인출합니다. 생활비로 쓰지 않는 초과분은 세후 현금으로 일반계좌에 옮겨둡니다. <b>단, 연금저축+IRP 합산 잔액이 2억원 미만인 해에는 조기소진을 막기 위해 적용하지 않습니다.</b></p>
+    </div>
+
+    <div class="acct-block">
+      <h3>IRP <span class="tag">모두 퇴직금, 개별납입금 없음</span></h3>
+      <div class="grid g3">
+        <div class="field"><label>평가금액</label><input type="number" id="irpBal" value="38000" step="100"><span class="unit-suffix">만원</span></div>
+        <div class="field"><label>퇴직원금</label><input type="number" id="irpRetire" value="35000" step="100"><span class="unit-suffix">만원</span></div>
+        <div class="field"><label>퇴직소득세율(%)</label><input type="number" id="irpRetireRate" value="6.5" step="0.1"></div>
+      </div>
+      <p class="note-line">세액공제 받은 원금+운용수익은 자동 계산.</p>
+    </div>
+
+    <div class="acct-block" style="border-left-color:var(--good);">
+      <h3>인출 전략 옵션 <span class="tag">beta</span></h3>
+      <label class="checkbox-label">
+        <input type="checkbox" id="taxBracketFilling">
+        저율과세 구간 채우기 (Tax-Bracket Filling) 활성
+      </label>
+      <p class="note-line">국민연금 개시 전 또는 과세표준이 낮은 해에는, 생활비로 필요한 금액을 넘더라도 저율과세 한도(연 1,500만원)까지 연금저축/IRP를 추가로 인출하여 세후 현금으로 일반계좌에 옮겨둡니다. 단, 사적연금 세율은 나이가 들수록 낮아지므로(70세 미만 5.5%→80세 이상 3.3%) 항상 유리한 것은 아닙니다. 계산 시 미적용 대비 평생비용을 비교하여, 실제로 더 유리할 때만 자동 채택합니다. <b>또한 연금저축+IRP 합산 잔액이 2억원 미만인 해에는 조기소진을 막기 위해 적용하지 않습니다.</b></p>
+      <label class="checkbox-label">
+        <input type="checkbox" id="extendedRatioSearch">
+        계좌별 인출비율 믹스 탐색 (10% 단위, Dynamic_A/B/C 대체)
+      </label>
+      <p class="note-line">고정된 3가지 인출순서(Dynamic_A/B/C) 대신, 연금저축:IRP 저율과세 인출 비율을 0%~100% (10% 단위, 11가지 조합)으로 탐색하여 매년 실제 세후비용이 가장 낮은 조합을 선택합니다. 후보 수가 늘어나 계산 시간이 길어질 수 있습니다.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2><span class="num">6</span>건강보험료 설정 (지역가입자)</h2>
+    <details class="hi-collapse">
+      <summary>2026년 기준 기본값 적용됨 — 필요 시 펼쳐서 수정</summary>
+      <div class="hi-body">
+        <div class="grid g3" style="margin-top:8px;">
+          <div class="field"><label>지역가입자 보험료율(%)</label><input type="number" id="hiRate" value="7.19" step="0.01"></div>
+          <div class="field"><label>연소득 공제액</label><input type="number" id="hiDeduct" value="336" step="1"><span class="unit-suffix">만원</span></div>
+          <div class="field"><label>장기요양보험료율(건보료 대비 %)</label><input type="number" id="ltcRate" value="12.95" step="0.01"></div>
+        </div>
+      </div>
+    </details>
+  </div>
+
+  <button type="button" class="sub-btn" id="presetBtn" style="width:100%;margin-bottom:12px;" onclick="applyPreset()">PR · 테스트용 기본값 자동 프리셋</button>
+
+  <button class="run-btn" id="runBtn">최적 인출 순서 찾기</button>
+  <div class="spinner" id="spinner">동적 최적화 탐색 · 과세 세부구간 · 건강보험료 부과기준 반영 계산 중…</div>
+
+</section>
+
+<section id="results">
+
+  <div class="card reco" id="recoCard"></div>
+
+  <div class="card">
+    <h2><span class="num">7</span>연령별 인출 타임라인</h2>
+    <p class="sub">최적 전략 실행 시 나이대별 주 주요 인출 경로입니다.</p>
+    <div class="timeline-container" id="timelineContainer"></div>
+  </div>
+
+  <div class="card">
+    <h2><span class="num">8</span>전략 비교</h2>
+    <p class="sub" id="compareSub">평생 총 세금·건보료·최종 잔여자산을 전략별 비교.</p>
+    <div id="compareCards" class="compare-cards"></div>
+    <p class="sub" id="hiSameNote" style="margin:10px 0 0;"></p>
+  </div>
+
+  <div class="card ai-report" id="aiReportBox">
+    <h3>🤖 AI 인출 전략 분석 보고</h3>
+    <div id="aiReportContent"></div>
+  </div>
+
+  <div class="card">
+    <h2><span class="num">9</span>자산 잔액 추이</h2>
+    <p class="sub" id="balanceChartSub">동적 최적화 전략 기준</p>
+    <div class="chart-wrap"><canvas id="chartBalance" height="220"></canvas></div>
+  </div>
+
+  <div class="card">
+    <h2><span class="num">10</span>세금·건보료 지출(동적최적화)</h2>
+    <div class="chart-wrap"><canvas id="chartCost" height="220"></canvas></div>
+  </div>
+
+  <div class="card">
+    <h2><span class="num">11</span>누적절감액 (vs 최악 인출 전략)</h2>
+    <p class="sub" id="cumSavingsSub">동적 최적화가 누적으로 얼마 절감하는지 비교 확인.</p>
+    <button type="button" class="sub-btn no-print" id="cumSavingsBtn" style="width:100%;">📊 누적 절감액 비교표 보기</button>
+    <div id="cumSavingsWrap" style="display:none;margin-top:12px;">
+      <div class="tbl-scroll row-alt">
+        <table id="cumSavingsTable"></table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2><span class="num">12</span>연도별 상세</h2>
+    <p class="sub">나이 클릭하면 상세 계산 내역 확인 가능.</p>
+    
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:10px;">
+      <div class="toggle-row" id="detailStrategyRow" style="flex:2; margin:0;"></div>
+      <div class="toggle-row" id="viewModeRow" style="flex:1; min-width:160px; margin:0;">
+        <button type="button" class="toggle-btn active" data-view="year">년기준</button>
+        <button type="button" class="toggle-btn" data-view="month">월기준</button>
+      </div>
+    </div>
+
+    <button type="button" class="sub-btn no-print" id="detailSummaryBtn" style="width:100%;margin-bottom:12px;">🧮 항목별 합계 보기 (4개 전략 비교)</button>
+    <div id="detailSummaryWrap" style="display:none;margin-bottom:16px;">
+      <div class="tbl-scroll row-alt">
+        <table id="detailSummaryTable"></table>
+      </div>
+    </div>
+
+    <div class="tbl-scroll row-alt">
+      <table id="detailTable"></table>
+    </div>
+  </div>
+
+  <div class="disclaimer" id="disclaimerBox"></div>
+
+  <div class="action-row-main">
+    <button class="save-btn" id="excelDetailBtn">📊엑셀(CSV) 저장</button>
+    <button class="save-btn red-btn" id="printPdfBtn">🖨️PDF로 저장(인쇄)</button>
+  </div>
+  <p class="note-line no-print" style="margin-top:8px;">※ 클릭 후 인쇄 대화상자에서 "대상"을 <b>PDF로 저장</b>으로 선택하면, 화면 캡처가 아닌 실제 인쇄 레이아웃(A4)으로 PDF가 저장됩니다.</p>
+
+</section>
+
+</div>
+
+<div class="modal-overlay" id="detailModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3 id="modalTitle">세부 계산 내역</h3>
+      <button class="modal-close" id="modalCloseBtn">&times;</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+    <div style="margin-top:14px; text-align:right;">
+      <button class="sub-btn" id="excelModalBtn" style="width:auto; padding:6px 14px;">📥 해당 연도 내역 엑셀 받기</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ---------------------------------------------------------------
+   상수 / 세율표
+--------------------------------------------------------------- */
+const BRACKETS = [
+  {limit:14000000,   rate:0.06, ded:0},
+  {limit:50000000,   rate:0.15, ded:1260000},
+  {limit:88000000,   rate:0.24, ded:5760000},
+  {limit:150000000,  rate:0.35, ded:15440000},
+  {limit:300000000,  rate:0.38, ded:19940000},
+  {limit:500000000,  rate:0.40, ded:25940000},
+  {limit:1000000000, rate:0.42, ded:35940000},
+  {limit:Infinity,   rate:0.45, ded:65940000},
+];
+function comprehensiveTax(base){
+  if(base<=0) return 0;
+  const b = BRACKETS.find(b=>base<=b.limit);
+  const t = base*b.rate - b.ded;
+  return Math.max(0,t) * 1.1; 
+}
+function pensionIncomeDeduction(total){
+  if(total<=3500000) return total;
+  if(total<=7000000) return 3500000+(total-3500000)*0.4;
+  if(total<=14000000) return Math.min(4900000+(total-7000000)*0.2, 9000000);
+  return Math.min(6300000+(total-14000000)*0.1, 9000000);
+}
+function ageBasedPensionRate(age){
+  if(age<70) return 0.055;
+  if(age<80) return 0.044;
+  return 0.033;
+}
+const FIN_THRESHOLD = 20000000;
+const HI_FIN_THRESHOLD = 10000000;
+const PRIVATE_PENSION_THRESHOLD = 15000000;
+// 연금저축+IRP 합산 잔액이 이 금액 미만이면, 생활비 필요를 넘어서는 강제/구간채우기 인출(저율과세 한도 채우기)을
+// 적용하지 않는다. 잔액이 작을 때 무조건 1,500만원 한도까지 인출하면 세제혜택보다 조기 소진 손실이 커질 수 있다.
+const PENSION_EXCESS_WITHDRAW_MIN_BAL = 200000000; // 2억원
+const PERSONAL_DEDUCT = 1500000;
+
+document.querySelectorAll('.toggle-btn[data-group]').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    const group = btn.dataset.group;
+    document.querySelectorAll(`.toggle-btn[data-group="${group}"]`).forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+  });
+});
+function getToggle(group){
+  return document.querySelector(`.toggle-btn[data-group="${group}"].active`).dataset.val;
+}
+
+document.querySelectorAll('.toggle-btn[data-preset]').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.toggle-btn[data-preset]').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    const preset = btn.dataset.preset;
+    if(preset==='montecarlo'){
+      document.getElementById('retDeterministicRow').style.display='none';
+      document.getElementById('retMonteCarloRow').style.display='grid';
+    } else {
+      document.getElementById('retDeterministicRow').style.display='grid';
+      document.getElementById('retMonteCarloRow').style.display='none';
+      document.getElementById('retCommon').value = btn.dataset.val;
+    }
+  });
+});
+function getRetPreset(){
+  return document.querySelector('.toggle-btn[data-preset].active').dataset.preset;
+}
+
+function applyPreset(){
+  // 1. 기초 정보
+  document.getElementById('curAge').value = 56;
+  document.getElementById('lifeExp').value = 92;
+  document.getElementById('inflation').value = 3.0;
+  document.querySelector('.toggle-btn[data-group="spouse"][data-val="Y"]').click(); // 공제비대상
+  document.querySelector('.toggle-btn[data-group="fin"][data-val="Y"]').click();    // 금융소득종합과세 대상자
+
+  // 2. 월 필요 생활비
+  document.getElementById('monthlyNeed').value = 420;
+
+  // 3. 기대수익률
+  document.querySelector('.toggle-btn[data-preset="balanced"]').click();
+  document.getElementById('retCommon').value = 5.0;
+
+  // 4. 국민연금
+  document.getElementById('npMonthly').value = 180;
+
+  // 5. 계좌별 자산
+  document.getElementById('genBal').value = 50000;      // 일반계좌 평가금액 5억
+  document.getElementById('genDividend').value = 200;   // 월 예상 배당금 200만
+  document.getElementById('psBal').value = 35000;       // 연금저축 평가금액 3억5천
+  document.getElementById('psNontax').value = 4000;     // 세액공제 안받은 원금 4천만
+  document.getElementById('irpBal').value = 110000;     // IRP 평가금액 11억
+  document.getElementById('irpRetire').value = 86000;   // 퇴직원금 8억6천
+  document.getElementById('irpRetireRate').value = 12.5; // 퇴직소득세율 12.5%
+}
+
+function num(id){ return parseFloat(document.getElementById(id).value)||0; }
+function numMan(id){ return (parseFloat(document.getElementById(id).value)||0)*10000; }
+
+function readInputs(){
+  const isMC = getRetPreset()==='montecarlo';
+  const genBal = numMan('genBal');
+  const genDividendAnnual = numMan('genDividend')*12;
+
+  const psBal = numMan('psBal');
+  const psNontax = Math.min(psBal, numMan('psNontax'));
+  const psCredit = Math.max(0, psBal - psNontax);
+
+  const irpBal = numMan('irpBal');
+  const irpRetire = Math.min(irpBal, numMan('irpRetire'));
+  const irpCredit = Math.max(0, irpBal - irpRetire);
+
+  return {
+    curAge: num('curAge'),
+    lifeExp: num('lifeExp'),
+    inflation: num('inflation')/100,
+    spouse: getToggle('spouse')==='Y',
+    finCompre: getToggle('fin')==='Y',
+    monthlyNeed: numMan('monthlyNeed'),
+    isMonteCarlo: isMC,
+    retCommon: num('retCommon')/100,
+    retMean: num('retMean')/100,
+    retStd: num('retStd')/100,
+    mcTrials: Math.max(10, Math.min(1000, Math.round(num('mcTrials'))||150)),
+    npStartAge: num('npStartAge'),
+    npMonthly: numMan('npMonthly'),
+    npDeferMax: num('npDeferMax'),
+    genBal, genDividendAnnual,
+    psBal, psNontax, psCredit,
+    psDeductPriority: document.getElementById('psDeductPriority').checked,
+    taxBracketFilling: document.getElementById('taxBracketFilling').checked,
+    extendedRatioSearch: document.getElementById('extendedRatioSearch').checked,
+    irpBal, irpRetire, irpCredit,
+    irpRetireRate: num('irpRetireRate')/100,
+    hiRate: num('hiRate')/100,
+    hiDeduct: numMan('hiDeduct'),
+    ltcRate: num('ltcRate')/100,
+  };
+}
+
+function validateInputs(inp){
+  const errors = [];
+  const warnings = [];
+
+  if(inp.lifeExp <= inp.curAge){
+    errors.push("기대수명은 현재 나이보다 커야 합니다.");
+  }
+  if(inp.curAge < 20 || inp.curAge > 100){
+    errors.push("현재 나이는 20세~100세 사이로 입력해 주세요.");
+  }
+  if(numMan('psNontax') > numMan('psBal')){
+    errors.push("연금저축 세액공제 안 받은 원금이 평가금액보다 클 수 없습니다.");
+  }
+  if(numMan('irpRetire') > numMan('irpBal')){
+    errors.push("IRP 퇴직원금이 평가금액보다 클 수 없습니다.");
+  }
+  if(inp.monthlyNeed <= 0){
+    warnings.push("월 필요 생활비가 0원 이하입니다.");
+  }
+  if(inp.retCommon < 0 || inp.retMean < 0){
+    warnings.push("수익률이 음수(-)로 입력되었습니다.");
+  }
+  if(inp.npStartAge < 60 || inp.npStartAge > 70){
+    warnings.push("국민연금 개시 나이는 조기수령(60세)~연기수령(70세) 범위 밖입니다. 감액/증액은 60~70세 범위(각 최대 5년)로 제한 계산됩니다.");
+  }
+
+  return { errors, warnings };
+}
+
+function freshAccounts(inp){
+  // 배당수익률은 초기 입력값(원금 대비 배당금)으로 한 번 고정한다.
+  // divPrincipal은 "배당을 만들어내는 원금"으로, 시장 수익률(평가금액 변동)과는 무관하며
+  // 오직 general_principal 단계에서 실제로 원금을 인출한 만큼만 줄어든다.
+  const divYieldRate = inp.genBal > 0 ? (inp.genDividendAnnual / inp.genBal) : 0;
+  return {
+    general: { 
+      balance: inp.genBal, 
+      initialBal: inp.genBal, 
+      dividendAnnual: inp.genDividendAnnual,
+      initialDividend: inp.genDividendAnnual,
+      divYieldRate,
+      divPrincipal: inp.genBal,
+      cashBalance: 0 // 연금계좌에서 이전된 세후 현금(배당을 만들지 않는 순수 현금) 버킷
+    },
+    ps: {
+      balance: inp.psBal, nontax: inp.psNontax, retire:0, credit: inp.psCredit,
+      startAge: null, year: 0
+    },
+    irp: {
+      balance: inp.irpBal, nontax: 0, retire: inp.irpRetire, credit: inp.irpCredit,
+      retireRate: inp.irpRetireRate, startAge: null, year: 0
+    }
+  };
+}
+function cloneAccounts(a){ return JSON.parse(JSON.stringify(a)); }
+
+function pensionLimit(acc){
+  const year = acc.year===0 ? 1 : acc.year;
+  if(year>=11) return Infinity;
+  const balanceForLimit = acc.balance;
+  return balanceForLimit/(11-Math.min(year,10)) * 1.2;
+}
+
+function withdrawStage(acc, isIRP, stage, want, age, ls){
+  if(want<=0 || acc.balance<=0) return {actual:0, retireTaxBase:{within:0,over:0}, step3:{within:0,over:0}};
+  if(age<55) return {actual:0, retireTaxBase:{within:0,over:0}, step3:{within:0,over:0}};
+
+  if(acc.startAge===null){ acc.startAge = age; acc.year = 1; }
+
+  let out = {actual:0, retireTaxBase:{within:0,over:0}, step3:{within:0,over:0}};
+
+  if(stage==='nontax'){
+    const amt = Math.min(want, acc.nontax);
+    acc.nontax -= amt; acc.balance -= amt;
+    out.actual = amt;
+    return out;
+  }
+
+  if(stage==='retire' && isIRP){
+    const amt = Math.min(want, acc.retire);
+    const within = Math.min(amt, ls.limitLeft);
+    const over = amt - within;
+    acc.retire -= amt; acc.balance -= amt;
+    ls.limitLeft -= within;
+    out.actual = amt;
+    out.retireTaxBase = {within, over};
+    return out;
+  }
+
+  if(stage==='step3' || stage==='step3cap'){
+    const pool = Math.max(0, acc.balance - acc.nontax - acc.retire);
+    const amt = Math.min(want, pool);
+    const within = Math.min(amt, ls.limitLeft);
+    const over = amt - within;
+    acc.balance -= amt;
+    acc.credit = Math.max(0, acc.credit - amt);
+    ls.limitLeft -= within;
+    out.actual = amt;
+    out.step3 = {within, over};
+    return out;
+  }
+  return out;
+}
+
+function stageOrder(strategy, psDeductPriority){
+  let baseOrder = [];
+  switch(strategy){
+    case 'general_first':
+      baseOrder = [
+        {a:'general_div'},
+        {a:'general_principal'},
+        {a:'ps', s:'nontax'}, {a:'irp', s:'nontax'}, {a:'irp', s:'retire'},
+        {a:'ps', s:'step3cap'}, {a:'ps', s:'step3'},
+        {a:'irp', s:'step3'}
+      ];
+      break;
+    case 'ps_first':
+      baseOrder = [
+        {a:'general_div'},
+        {a:'ps', s:'nontax'}, {a:'ps', s:'step3cap'}, {a:'ps', s:'step3'},
+        {a:'irp', s:'nontax'}, {a:'irp', s:'retire'}, {a:'irp', s:'step3'},
+        {a:'general_principal'}
+      ];
+      break;
+    case 'irp_first':
+      baseOrder = [
+        {a:'general_div'},
+        {a:'irp', s:'nontax'}, {a:'irp', s:'retire'}, {a:'irp', s:'step3'},
+        {a:'ps', s:'nontax'}, {a:'ps', s:'step3cap'}, {a:'ps', s:'step3'},
+        {a:'general_principal'}
+      ];
+      break;
+    default: // optimized
+      baseOrder = [
+        {a:'general_div'},
+        {a:'ps', s:'step3cap'}, {a:'ps', s:'nontax'}, {a:'irp', s:'nontax'}, {a:'irp', s:'retire'},
+        {a:'irp', s:'step3cap'}, {a:'ps', s:'step3'}, {a:'irp', s:'step3'},
+        {a:'general_principal'}
+      ];
+      break;
+  }
+
+  if(psDeductPriority){
+    baseOrder = baseOrder.filter(item => !(item.a === 'ps' && item.s === 'step3cap'));
+    // '일반계좌 우선' 전략은 general_principal이 index 1에 위치하므로, 그 뒤(index 2)에 삽입해
+    // 일반계좌 원금이 여전히 연금저축보다 먼저 소진되도록 한다.
+    const insertAt = strategy === 'general_first' ? 2 : 1;
+    baseOrder.splice(insertAt, 0, {a:'ps', s:'step3cap'});
+  }
+
+  return baseOrder;
+}
+
+// 연금저축(ratio%) + IRP(100-ratio%) 동시 인출 믹스 순서 생성.
+// psDeductPriority가 켜져 있으면 믹스 인출을 general_div 직후(최우선)로 당겨온다.
+function buildRatioOrder(ratio, psDeductPriority){
+  const mix = {a:'step3mix', ratio};
+  if(psDeductPriority){
+    return [
+      {a:'general_div'}, mix,
+      {a:'ps', s:'nontax'}, {a:'irp', s:'nontax'}, {a:'irp', s:'retire'},
+      {a:'general_principal'}
+    ];
+  }
+  return [
+    {a:'general_div'},
+    {a:'ps', s:'nontax'}, {a:'irp', s:'nontax'}, {a:'irp', s:'retire'},
+    mix,
+    {a:'general_principal'}
+  ];
+}
+
+function candidateOrders(strategy, psDeductPriority, extendedRatioSearch){
+  if(strategy!=='optimized'){
+    return [{name:strategy, order: stageOrder(strategy, psDeductPriority)}];
+  }
+
+  // 확장 탐색: 연금저축:IRP 저율과세 인출 비율을 0%~100%, 10%p 단위 11가지로 탐색
+  if(extendedRatioSearch){
+    const candidates = [];
+    for(let pct=0; pct<=100; pct+=10){
+      candidates.push({ name:`Mix_PS${pct}_IRP${100-pct}`, order: buildRatioOrder(pct, psDeductPriority) });
+    }
+    return candidates;
+  }
+
+  let candidates = [
+    { name:'Dynamic_A', order:[
+      {a:'general_div'}, {a:'ps', s:'nontax'}, {a:'irp', s:'nontax'}, {a:'irp', s:'retire'},
+      {a:'ps', s:'step3cap'}, {a:'irp', s:'step3cap'},
+      {a:'ps', s:'step3'}, {a:'irp', s:'step3'}, {a:'general_principal'}
+    ]},
+    { name:'Dynamic_B', order:[
+      {a:'general_div'}, {a:'ps', s:'step3cap'}, {a:'ps', s:'nontax'},
+      {a:'irp', s:'nontax'}, {a:'irp', s:'retire'}, {a:'ps', s:'step3'}, {a:'irp', s:'step3'}, {a:'general_principal'}
+    ]},
+    { name:'Dynamic_C', order:[
+      {a:'general_div'}, {a:'irp', s:'nontax'}, {a:'irp', s:'retire'}, {a:'irp', s:'step3cap'},
+      {a:'ps', s:'step3cap'}, {a:'ps', s:'nontax'}, {a:'ps', s:'step3'}, {a:'general_principal'}
+    ]}
+  ];
+
+  if(psDeductPriority){
+    candidates.forEach(c => {
+      c.order = c.order.filter(item => !(item.a === 'ps' && item.s === 'step3cap'));
+      c.order.splice(1, 0, {a:'ps', s:'step3cap'});
+    });
+  }
+
+  return candidates;
+}
+
+function allocate(accounts, order, G, age){
+  const limitState = {
+    ps: { limitLeft: pensionLimit(accounts.ps) },
+    irp: { limitLeft: pensionLimit(accounts.irp) },
+  };
+  let remaining = G;
+  let step3TotalWithin = 0;
+  let retireTaxBase = 0, retireOverBase = 0;
+  let step3OverTotal = 0;
+  let genDivDrawn = 0, genPrincipalDrawn = 0, psDrawn = 0, irpDrawn = 0;
+  // 인출 원금 성격 구분: 비과세원금 / 퇴직원금 / 과세대상(세액공제원금+운용수익)
+  let psNontaxDrawn = 0, psTaxableDrawn = 0;
+  let irpNontaxDrawn = 0, irpRetireDrawn = 0, irpTaxableDrawn = 0;
+
+  for(const step of order){
+    if(remaining<=0.5) break;
+
+    // 1. 일반계좌 월배당금: 배당원금(divPrincipal) x 배당수익률로 매년 계산된 금액을 수령.
+    // 배당원금은 실제 원금 인출 시에만 줄어들며(시장수익률과 무관), 완전히 소진되면(잔액<=0) 배당도 중단된다.
+    if(step.a==='general_div'){
+      if(accounts.general.balance <= 0){ continue; }
+      const amt = Math.min(remaining, accounts.general.dividendAnnual);
+      remaining -= amt; genDivDrawn += amt;
+      continue;
+    }
+
+    // 2. 일반계좌 원금: 타 계좌 소진 후 최후의 인출 단계 적용
+    // 인출액(amt) 중 연금계좌에서 이전된 순수 현금(cashBalance)을 먼저 쓰고,
+    // 그래도 부족한 만큼만 배당원금(divPrincipal, 주식 등 배당 자산)에서 차감한다.
+    // → 배당을 만들지 않는 현금을 쓸 때는 다음 해 배당금이 줄지 않는다.
+    if(step.a==='general_principal'){
+      const amt = Math.min(remaining, accounts.general.balance);
+      if(amt > 0){
+        accounts.general.balance -= amt;
+        const cashUsed = Math.min(amt, accounts.general.cashBalance || 0);
+        accounts.general.cashBalance = (accounts.general.cashBalance || 0) - cashUsed;
+        const stockPrincipalUsed = amt - cashUsed;
+        accounts.general.divPrincipal = Math.max(0, accounts.general.divPrincipal - stockPrincipalUsed);
+      }
+      remaining -= amt; genPrincipalDrawn += amt;
+      continue;
+    }
+
+    // 계좌별 인출비율 믹스: 연금저축(step.ratio %) + IRP(100-step.ratio %)를 동시에 저율과세 한도 내에서 인출
+    if(step.a==='step3mix'){
+      const capLeft = Math.max(0, PRIVATE_PENSION_THRESHOLD - step3TotalWithin);
+      const want = Math.min(remaining, capLeft);
+      const psAvail = Math.max(0, accounts.ps.balance - accounts.ps.nontax - accounts.ps.retire);
+      const irpAvail = Math.max(0, accounts.irp.balance - accounts.irp.nontax - accounts.irp.retire);
+      let wantPS = want * (step.ratio/100);
+      let wantIRP = want - wantPS;
+      if(wantPS > psAvail){ const short = wantPS - psAvail; wantPS = psAvail; wantIRP = Math.min(irpAvail, wantIRP + short); }
+      if(wantIRP > irpAvail){ const short = wantIRP - irpAvail; wantIRP = irpAvail; wantPS = Math.min(psAvail, wantPS + short); }
+
+      const rPs = withdrawStage(accounts.ps, false, 'step3', wantPS, age, limitState.ps);
+      const rIrp = withdrawStage(accounts.irp, true, 'step3', wantIRP, age, limitState.irp);
+      remaining -= (rPs.actual + rIrp.actual);
+      step3TotalWithin += rPs.step3.within + rIrp.step3.within;
+      step3OverTotal += rPs.step3.over + rIrp.step3.over;
+      psDrawn += rPs.actual; psTaxableDrawn += rPs.actual;
+      irpDrawn += rIrp.actual; irpTaxableDrawn += rIrp.actual;
+      continue;
+    }
+
+    const acc = step.a==='ps'? accounts.ps : accounts.irp;
+    const isIRP = step.a==='irp';
+    const ls = step.a==='ps'? limitState.ps : limitState.irp;
+
+    if(step.s==='nontax'){
+      const r = withdrawStage(acc, isIRP, 'nontax', remaining, age, ls);
+      remaining -= r.actual;
+      if(isIRP){ irpDrawn += r.actual; irpNontaxDrawn += r.actual; }
+      else { psDrawn += r.actual; psNontaxDrawn += r.actual; }
+      continue;
+    }
+    if(step.s==='retire'){
+      const r = withdrawStage(acc, isIRP, 'retire', remaining, age, ls);
+      remaining -= r.actual;
+      retireTaxBase += r.retireTaxBase.within;
+      retireOverBase += r.retireTaxBase.over;
+      irpDrawn += r.actual; irpRetireDrawn += r.actual;
+      continue;
+    }
+    if(step.s==='step3cap'){
+      const capLeft = Math.max(0, PRIVATE_PENSION_THRESHOLD - step3TotalWithin);
+      const want = Math.min(remaining, capLeft);
+      const r = withdrawStage(acc, isIRP, 'step3', want, age, ls);
+      remaining -= r.actual;
+      step3TotalWithin += r.step3.within;
+      step3OverTotal += r.step3.over;
+      if(isIRP){ irpDrawn += r.actual; irpTaxableDrawn += r.actual; }
+      else { psDrawn += r.actual; psTaxableDrawn += r.actual; }
+      continue;
+    }
+    if(step.s==='step3'){
+      const r = withdrawStage(acc, isIRP, 'step3', remaining, age, ls);
+      remaining -= r.actual;
+      step3TotalWithin += r.step3.within;
+      step3OverTotal += r.step3.over;
+      if(isIRP){ irpDrawn += r.actual; irpTaxableDrawn += r.actual; }
+      else { psDrawn += r.actual; psTaxableDrawn += r.actual; }
+      continue;
+    }
+  }
+
+  return {
+    shortfall: Math.max(0, remaining),
+    genDivDrawn, genPrincipalDrawn, genW: genDivDrawn + genPrincipalDrawn, 
+    psDrawn, psW: psDrawn, irpDrawn, irpW: irpDrawn,
+    psNontaxDrawn, psTaxableDrawn,
+    irpNontaxDrawn, irpRetireDrawn, irpTaxableDrawn,
+    step3Within: step3TotalWithin, step3Over: step3OverTotal,
+    retireWithin: retireTaxBase, retireOver: retireOverBase,
+  };
+}
+
+function computeTaxAndHI(alloc, npGross, dividendIncome, age, inp, irpYear){
+  const deduct = PERSONAL_DEDUCT * (inp.spouse? 2:1);
+  const npTaxable = npGross>0 ? Math.max(0, npGross - pensionIncomeDeduction(npGross)) : 0;
+
+  let finTax = 0;
+  let npTax = 0;
+  let foldedBase = npTaxable;
+
+  if(dividendIncome<=FIN_THRESHOLD || !inp.finCompre){
+    // 1) 금융소득 분리과세 (15.4%)
+    finTax = dividendIncome*0.154;
+    // 2) 국민연금 과세표준에 대한 종합소득세 (기존 코드에서 누락되어 있던 부분 — 여기서 별도 계산해 더한다)
+    npTax = comprehensiveTax(Math.max(0, npTaxable - deduct));
+  } else {
+    // 금융소득 종합과세 — 이 분기에서는 국민연금 과세표준(npTaxable)이 이미 아래 계산에 포함되므로 npTax는 0으로 둔다
+    const excess = dividendIncome - FIN_THRESHOLD;
+    const totalSeparate = FIN_THRESHOLD*0.154 + comprehensiveTax(Math.max(0, npTaxable+excess-deduct));
+    const totalCombined = comprehensiveTax(Math.max(0, npTaxable+dividendIncome-deduct));
+    if(totalCombined >= totalSeparate){
+      finTax = totalCombined; foldedBase = npTaxable+dividendIncome;
+    } else {
+      finTax = totalSeparate; foldedBase = npTaxable+excess;
+    }
+  }
+
+  const ageRate = ageBasedPensionRate(age);
+  let privatePensionTax;
+  if(alloc.step3Within<=PRIVATE_PENSION_THRESHOLD){
+    privatePensionTax = alloc.step3Within * ageRate;
+  } else {
+    // 사적연금(연금수령한도 이내분)이 연 1,500만원 초과 시 분리과세 선택 세율은 16.5% (15%+지방소득세)
+    const flatOption = alloc.step3Within * 0.165;
+    const withBase = comprehensiveTax(Math.max(0, foldedBase+alloc.step3Within-deduct));
+    const withoutBase = comprehensiveTax(Math.max(0, foldedBase-deduct));
+    const combinedOption = withBase - withoutBase;
+    privatePensionTax = Math.min(flatOption, combinedOption);
+  }
+
+  const step3OverTax = alloc.step3Over * 0.165;
+  const reduction = irpYear<=10 ? 0.30 : 0.40;
+  const retireWithinTax = alloc.retireWithin * inp.irpRetireRate * (1-reduction) * 1.1;
+  const retireOverTax = alloc.retireOver * inp.irpRetireRate * 1.0 * 1.1;
+
+  const totalTax = finTax + npTax + privatePensionTax + step3OverTax + retireWithinTax + retireOverTax;
+
+  const hiBase = (npGross*0.5) + (dividendIncome>=HI_FIN_THRESHOLD ? dividendIncome : 0);
+  const hiTaxable = Math.max(0, hiBase - inp.hiDeduct);
+  const hiBasic = hiTaxable * inp.hiRate;
+  const hiLtc = hiBasic * inp.ltcRate;
+  const totalHI = hiBasic + hiLtc;
+
+  return { totalTax, totalHI, breakdown:{finTax, npTax, privatePensionTax, step3OverTax, retireWithinTax, retireOverTax, hiBasic, hiLtc} };
+}
+
+function nationalPensionAnnual(age, startAge, monthlyAt65, growthRate){
+  if(age<startAge) return 0;
+
+  let baseMonthly = monthlyAt65;
+  if(startAge > 65){
+    // 연기수령: 최대 5년, 연 +7.2%(월 0.6%)
+    const deferYears = Math.min(5, startAge-65);
+    baseMonthly = monthlyAt65 * (1 + 0.072*deferYears);
+  } else if(startAge < 65){
+    // 조기수령: 최대 5년, 연 -6%(월 0.5%)
+    const earlyYears = Math.min(5, 65-startAge);
+    baseMonthly = monthlyAt65 * (1 - 0.06*earlyYears);
+  }
+
+  const yearsFromStart = age-startAge;
+  const grown = baseMonthly * Math.pow(1+growthRate, yearsFromStart);
+  return grown*12;
+}
+
+function randomNormal(mean, std){
+  let u=0, v=0;
+  while(u===0) u=Math.random();
+  while(v===0) v=Math.random();
+  const z = Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);
+  return mean + z*std;
+}
+function percentile(sortedArr, p){
+  if(sortedArr.length===0) return 0;
+  const idx = Math.min(sortedArr.length-1, Math.max(0, Math.round((p/100)*(sortedArr.length-1))));
+  return sortedArr[idx];
+}
+
+function simulateStrategy(inp, strategy, npStartAge, getReturn){
+  const accounts = freshAccounts(inp);
+  const candidates = candidateOrders(strategy, inp.psDeductPriority, inp.extendedRatioSearch);
+  const npGrowthRate = inp.inflation*0.5;
+  const needGrowthRate = inp.inflation*0.5;
+  const rows = [];
+  let totalTax=0, totalHI=0;
+  let depletedAge = null;
+  let need = inp.monthlyNeed*12;
+  let yearIdx = 0;
+
+  for(let age=inp.curAge; age<=inp.lifeExp; age++){
+    const npGross = nationalPensionAnnual(age, npStartAge, inp.npMonthly, npGrowthRate);
+    // 배당원금은 시장수익률로 불어난 잔액이 아니라, 실제 인출로 줄어든 divPrincipal 기준으로 계산한다.
+    // 다만 시장 손실 등으로 실제 잔액이 divPrincipal보다 작아지면 그 이상은 배당을 낼 수 없으므로 캡을 씌운다.
+    accounts.general.divPrincipal = Math.min(accounts.general.divPrincipal, Math.max(0, accounts.general.balance));
+    accounts.general.dividendAnnual = accounts.general.divPrincipal * accounts.general.divYieldRate;
+    const dividendIncome = accounts.general.dividendAnnual;
+    const irpYear = accounts.irp.year===0 ? 1 : accounts.irp.year;
+
+    let best = null;
+    for(const cand of candidates){
+      let G = Math.max(0, need - npGross);
+      let tax=0, hi=0;
+      for(let iter=0; iter<8; iter++){
+        const snap = cloneAccounts(accounts);
+        const allocR = allocate(snap, cand.order, G, age);
+        const r = computeTaxAndHI(allocR, npGross, dividendIncome, age, inp, irpYear);
+        tax = r.totalTax; hi = r.totalHI;
+        const requiredTotal = need + tax + hi;
+        const newG = Math.max(0, requiredTotal - npGross);
+        if(Math.abs(newG-G) < 1000){ G = newG; break; }
+        G = newG;
+      }
+      const cost = tax+hi;
+      if(best===null || cost<best.cost){ best = { order:cand.order, G, tax, hi, cost }; }
+    }
+
+    const allocResult = allocate(accounts, best.order, best.G, age);
+    let taxHi = computeTaxAndHI(allocResult, npGross, dividendIncome, age, inp, irpYear);
+    let tax = taxHi.totalTax, hi = taxHi.totalHI;
+    let bracketFillAmount = 0;
+    let psForceFillAmount = 0;
+
+    // ---- 연금저축 세액공제 금액 최우선 인출 강제 적용 ----
+    // 체크 시, 그 해 생활비 필요와 무관하게 매년 사적연금 저율과세 한도(연 1,500만원, 연금저축+IRP 합산)
+    // 안에서 연금저축을 최우선/최대한 사용하도록 "무조건" 추가 인출한다. 연금저축 잔액(세액공제원금+운용수익)이
+    // 소진되면 이 블록은 자연히 0원이 되어 더 이상 작동하지 않는다. 초과 인출분(세후)은 일반계좌 현금으로 이전한다.
+    // 단, 연금계좌(연금저축+IRP) 합산 잔액이 2억원 미만인 해에는 조기소진 리스크가 커서 이 강제인출을 적용하지 않는다.
+    const pensionAcctBalForFill = accounts.ps.balance + accounts.irp.balance;
+    if(inp.psDeductPriority && pensionAcctBalForFill >= PENSION_EXCESS_WITHDRAW_MIN_BAL){
+      const capLeft = Math.max(0, PRIVATE_PENSION_THRESHOLD - allocResult.step3Within);
+      const psAvail = Math.max(0, accounts.ps.balance - accounts.ps.nontax); // 연금저축은 '퇴직원금' 버킷이 없음
+      const forceWant = Math.min(capLeft, psAvail);
+
+      if(forceWant > 100000){
+        const forceAlloc = allocate(accounts, [{a:'ps', s:'step3'}], forceWant, age);
+        psForceFillAmount = forceAlloc.step3Within + forceAlloc.step3Over;
+
+        allocResult.psW += forceAlloc.psW; allocResult.psDrawn += forceAlloc.psDrawn; allocResult.psTaxableDrawn += forceAlloc.psTaxableDrawn;
+        allocResult.step3Within += forceAlloc.step3Within; allocResult.step3Over += forceAlloc.step3Over;
+
+        const afterForceTaxHi = computeTaxAndHI(allocResult, npGross, dividendIncome, age, inp, irpYear);
+        const extraTaxF = Math.max(0, afterForceTaxHi.totalTax - tax);
+        const extraHiF = Math.max(0, afterForceTaxHi.totalHI - hi);
+        const netCashF = Math.max(0, psForceFillAmount - extraTaxF - extraHiF);
+        accounts.general.balance += netCashF;
+        accounts.general.cashBalance = (accounts.general.cashBalance || 0) + netCashF;
+        tax = afterForceTaxHi.totalTax; hi = afterForceTaxHi.totalHI;
+        taxHi = afterForceTaxHi;
+      }
+    }
+
+    // ---- 저율과세 구간 채우기 (Tax-Bracket Filling) ----
+    // 국민연금 개시 전이거나 과세표준이 낮은 해에는, 그 해 필요생활비를 넘더라도
+    // 사적연금 저율과세 한도(연 1,500만원, 매년 리셋)까지 연금저축/IRP를 추가 인출해
+    // 세후 현금으로 일반계좌에 옮겨둔다. 한도는 이월되지 않으므로 낮은 세율 구간을
+    // 그냥 흘려보내지 않는 것이 평생 세부담을 줄이는 핵심 전략이다.
+    // 단, 연금계좌(연금저축+IRP) 합산 잔액이 2억원 미만인 해에는 적용하지 않는다.
+    const pensionAcctBalForBracket = accounts.ps.balance + accounts.irp.balance;
+    if(inp.taxBracketFilling && pensionAcctBalForBracket >= PENSION_EXCESS_WITHDRAW_MIN_BAL){
+      const npTaxableEst = npGross>0 ? Math.max(0, npGross - pensionIncomeDeduction(npGross)) : 0;
+      const lowIncomeYear = npTaxableEst < 14000000; // 국민연금 미개시(0 포함) 또는 종합과세 최저구간 이하
+      const capLeft = Math.max(0, PRIVATE_PENSION_THRESHOLD - allocResult.step3Within);
+      const psAvail = Math.max(0, accounts.ps.balance - accounts.ps.nontax - accounts.ps.retire);
+      const irpAvail = Math.max(0, accounts.irp.balance - accounts.irp.nontax - accounts.irp.retire);
+      const avail = psAvail + irpAvail;
+      const fillWant = Math.min(capLeft, avail);
+
+      if(lowIncomeYear && fillWant > 100000){
+        const psRatio = avail>0 ? Math.round((psAvail/avail)*100) : 50;
+        const fillAlloc = allocate(accounts, [{a:'step3mix', ratio: psRatio}], fillWant, age);
+        bracketFillAmount = fillAlloc.step3Within + fillAlloc.step3Over;
+
+        allocResult.psW += fillAlloc.psW; allocResult.psDrawn += fillAlloc.psDrawn; allocResult.psTaxableDrawn += fillAlloc.psTaxableDrawn;
+        allocResult.irpW += fillAlloc.irpW; allocResult.irpDrawn += fillAlloc.irpDrawn; allocResult.irpTaxableDrawn += fillAlloc.irpTaxableDrawn;
+        allocResult.step3Within += fillAlloc.step3Within; allocResult.step3Over += fillAlloc.step3Over;
+
+        const afterTaxHi = computeTaxAndHI(allocResult, npGross, dividendIncome, age, inp, irpYear);
+        const extraTax = Math.max(0, afterTaxHi.totalTax - tax);
+        const extraHi = Math.max(0, afterTaxHi.totalHI - hi);
+        // 인출 세율은 항상 100% 미만이므로 순수취액은 사실상 항상 양수
+        const netCash = Math.max(0, bracketFillAmount - extraTax - extraHi);
+        accounts.general.balance += netCash;
+        accounts.general.cashBalance = (accounts.general.cashBalance || 0) + netCash;
+        tax = afterTaxHi.totalTax; hi = afterTaxHi.totalHI;
+        taxHi = afterTaxHi;
+      }
+    }
+
+
+    const r = getReturn(yearIdx);
+    accounts.general.balance *= (1+r);
+    accounts.ps.balance *= (1+r);
+    accounts.irp.balance *= (1+r);
+
+    if(accounts.ps.year>0) accounts.ps.year++;
+    if(accounts.irp.year>0) accounts.irp.year++;
+
+    const totalAsset = accounts.general.balance + accounts.ps.balance + accounts.irp.balance;
+    if(totalAsset<=0 && depletedAge===null && age<inp.lifeExp) depletedAge = age;
+
+    rows.push({
+      age, need, npGross,
+      genDividendPart: allocResult.genDivDrawn,
+      genExtraPart: allocResult.genPrincipalDrawn,
+      genW: allocResult.genW, psW: allocResult.psW, irpW: allocResult.irpW,
+      psNontaxW: allocResult.psNontaxDrawn, psTaxableW: allocResult.psTaxableDrawn,
+      irpNontaxW: allocResult.irpNontaxDrawn, irpRetireW: allocResult.irpRetireDrawn, irpTaxableW: allocResult.irpTaxableDrawn,
+      bracketFillAmount, psForceFillAmount,
+      tax, hi, totalAsset,
+      genBal: Math.max(0,accounts.general.balance), psBal: Math.max(0,accounts.ps.balance), irpBal: Math.max(0,accounts.irp.balance),
+      shortfall: allocResult.shortfall,
+      breakdown: taxHi.breakdown
+    });
+
+    totalTax += tax; totalHI += hi;
+    need *= (1+needGrowthRate);
+    yearIdx++;
+    if(totalAsset<=0){
+      accounts.general.balance=0; accounts.ps.balance=0; accounts.irp.balance=0;
+    }
+  }
+
+  const finalAsset = rows.length? rows[rows.length-1].totalAsset : 0;
+  return { rows, totalTax, totalHI, totalCost: totalTax+totalHI, finalAsset, depletedAge };
+}
+
+function runDeterministic(inp, strategy, npStartAge){
+  return simulateStrategy(inp, strategy, npStartAge, ()=>inp.retCommon);
+}
+
+// 몬테카를로 수익률 경로(시나리오)를 미리 생성한다.
+// 동일한 inp.mcTrials/lifeExp/curAge/retMean/retStd를 쓰는 두 시뮬레이션(예: 구간채우기 on/off)이
+// 같은 난수 경로로 비교되도록, 경로 생성을 runMonteCarlo 밖에서 한 번만 수행할 수 있게 분리한다.
+function generateReturnPaths(inp){
+  const yearsCount = inp.lifeExp-inp.curAge+1;
+  const paths = new Array(inp.mcTrials);
+  for(let t=0; t<inp.mcTrials; t++){
+    const path = new Array(yearsCount);
+    for(let y=0;y<yearsCount;y++) path[y] = randomNormal(inp.retMean, inp.retStd);
+    paths[t] = path;
+  }
+  return paths;
+}
+
+function runMonteCarlo(inp, strategies, npStartAge, sharedPaths){
+  const trialsByStrategy = {}; strategies.forEach(s=> trialsByStrategy[s]=[]);
+  // sharedPaths가 주어지지 않으면(단독 호출) 기존처럼 자체 생성한다.
+  const paths = sharedPaths || generateReturnPaths(inp);
+
+  for(let t=0; t<inp.mcTrials; t++){
+    const path = paths[t];
+    strategies.forEach(s=>{
+      const sim = simulateStrategy(inp, s, npStartAge, (yi)=>path[yi]);
+      trialsByStrategy[s].push(sim);
+    });
+  }
+
+  const agg = {};
+  strategies.forEach(s=>{
+    const arr = trialsByStrategy[s];
+    const sorted = [...arr].sort((a,b)=>a.totalCost-b.totalCost);
+    const rep = sorted[Math.floor(sorted.length/2)];
+    const finalAssets = arr.map(x=>x.finalAsset).sort((a,b)=>a-b);
+    const depletedCount = arr.filter(x=>x.depletedAge!==null).length;
+    agg[s] = {
+      ...rep,
+      depletionProb: depletedCount/arr.length,
+      p10Final: percentile(finalAssets,10),
+      p90Final: percentile(finalAssets,90),
+      trials: arr,
+    };
+  });
+  return agg;
+}
+
+function formatMoney(val, isMonthView){
+  if(val===undefined||val===null||isNaN(val)) return '-';
+  const targetVal = isMonthView ? val / 12 : val;
+  return Math.round(targetVal/10000).toLocaleString('ko-KR')+'만원';
+}
+function manwon(v){
+  if(v===undefined||v===null||isNaN(v)) return '-';
+  return Math.round(v/10000).toLocaleString('ko-KR')+'만원';
+}
+function eok(v){
+  return (v/100000000).toFixed(2)+'억원';
+}
+
+document.getElementById('runBtn').addEventListener('click', run);
+document.getElementById('printPdfBtn').addEventListener('click', printResultsAsPDF);
+document.getElementById('excelDetailBtn').addEventListener('click', downloadDetailExcel);
+
+document.querySelectorAll('#viewModeRow .toggle-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('#viewModeRow .toggle-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    window._isMonthView = (btn.dataset.view === 'month');
+    if(window._lastResults && window._selectedDetailStrategy){
+      renderDetailTable(window._lastResults[window._selectedDetailStrategy]);
+    }
+  });
+});
+
+const LABELS = {
+  optimized:'동적 최적화', general_first:'일반계좌 우선', ps_first:'연금저축 우선', irp_first:'IRP 우선'
+};
+const STRATEGY_ORDER = ['optimized','general_first','ps_first','irp_first'];
+
+function run(){
+  const alertEl = document.getElementById('errorAlert');
+  alertEl.style.display = 'none'; alertEl.innerHTML = '';
+
+  const inp = readInputs();
+  const val = validateInputs(inp);
+
+  if(val.errors.length > 0){
+    alertEl.innerHTML = '<b>입력 오류:</b><br>• ' + val.errors.join('<br>• ');
+    alertEl.style.display = 'block';
+    return;
+  }
+  if(val.warnings.length > 0){
+    alertEl.innerHTML = '<b>주의사항:</b><br>• ' + val.warnings.join('<br>• ');
+    alertEl.style.display = 'block';
+  }
+
+  const btn=document.getElementById('runBtn');
+  const spinner=document.getElementById('spinner');
+  btn.disabled=true; spinner.style.display='block';
+
+  setTimeout(()=>{
+    try{
+      let bestNpStart = inp.npStartAge;
+      if(inp.npDeferMax>0){
+        let bestCost = Infinity;
+        for(let d=0; d<=inp.npDeferMax; d++){
+          const startAge = inp.npStartAge + d;
+          const sim = runDeterministic(inp, 'optimized', startAge);
+          if(sim.totalCost < bestCost){ bestCost = sim.totalCost; bestNpStart = startAge; }
+        }
+      }
+
+      let results = {};
+      let bracketFillingUsed = false;
+      if(inp.isMonteCarlo){
+        // 구간채우기 on/off 비교가 서로 다른 무작위 수익률에 좌우되지 않도록,
+        // 이번 실행에 쓸 수익률 경로를 먼저 고정해서 두 시뮬레이션에 동일하게 재사용한다.
+        const sharedPaths = generateReturnPaths(inp);
+        results = runMonteCarlo(inp, STRATEGY_ORDER, bestNpStart, sharedPaths);
+        if(inp.taxBracketFilling){
+          // 구간채우기는 '조기 인출 시 낮은 세율' vs '나중에 인출 시 더 낮아지는 연령별 세율/향후 한도초과 회피 효과'의
+          // 상충관계가 있어 상황에 따라 유불리가 갈린다. 껐을 때와 비교해 실제로 평생비용을 낮출 때만 채택한다.
+          const inpOff = Object.assign({}, inp, { taxBracketFilling:false });
+          const offAgg = runMonteCarlo(inpOff, ['optimized'], bestNpStart, sharedPaths);
+          if(offAgg.optimized.totalCost < results.optimized.totalCost){
+            results.optimized = offAgg.optimized;
+          } else {
+            bracketFillingUsed = true;
+          }
+        }
+      } else {
+        STRATEGY_ORDER.forEach(s=>{ results[s] = runDeterministic(inp, s, bestNpStart); });
+        if(inp.taxBracketFilling){
+          const inpOff = Object.assign({}, inp, { taxBracketFilling:false });
+          const offRes = runDeterministic(inpOff, 'optimized', bestNpStart);
+          if(offRes.totalCost < results.optimized.totalCost){
+            results.optimized = offRes;
+          } else {
+            bracketFillingUsed = true;
+          }
+        }
+      }
+
+      window._lastInp = inp; window._lastResults = results; window._lastNpStart = bestNpStart;
+      window._bracketFillingUsed = bracketFillingUsed;
+      window._selectedDetailStrategy = 'optimized';
+      window._isMonthView = false;
+
+      document.getElementById('results').style.display='block';
+      renderResults(inp, results, bestNpStart);
+      document.getElementById('results').scrollIntoView({behavior:'smooth'});
+    } finally {
+      btn.disabled=false; spinner.style.display='none';
+    }
+  }, 30);
+}
+
+function drawChart(canvas, cfg){
+  const dpr = window.devicePixelRatio || 1;
+  const cssW = canvas.clientWidth || canvas.parentElement.clientWidth || 320;
+  const cssH = cfg.height || 220;
+  canvas.width = Math.round(cssW*dpr);
+  canvas.height = Math.round(cssH*dpr);
+  canvas.style.width = cssW+'px';
+  canvas.style.height = cssH+'px';
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,cssW,cssH);
+
+  const legendH = 24;
+  const pad = {l:56, r:14, t:10, b:26};
+  const plotW = cssW-pad.l-pad.r;
+  const plotH = cssH-pad.t-pad.b-legendH;
+  const n = cfg.labels.length;
+
+  let maxVal=0, minVal=0;
+  if(cfg.type==='band'){
+    maxVal = Math.max(...cfg.band.p90, 1);
+  } else if(cfg.stacked){
+    for(let i=0;i<n;i++){
+      let sum=0;
+      cfg.series.forEach(s=> sum+=Math.max(0,s.values[i]));
+      maxVal=Math.max(maxVal,sum);
+    }
+  } else {
+    cfg.series.forEach(s=> s.values.forEach(v=>{ maxVal=Math.max(maxVal,v); minVal=Math.min(minVal,v); }));
+  }
+  const axisMax = niceMax(maxVal||1);
+  const axisMin = minVal<0 ? -niceMax(-minVal||1) : 0;
+  const range = (axisMax-axisMin)||1;
+
+  function xPos(i){ return pad.l + (n<=1?plotW/2:(plotW*i/(n-1))); }
+  function yPos(v){ return pad.t + plotH - ((v-axisMin)/range)*plotH; }
+
+  ctx.strokeStyle='#e4ddc8'; ctx.fillStyle='#8a8370';
+  ctx.font='10px "IBM Plex Mono", monospace';
+  ctx.textAlign='right'; ctx.textBaseline='middle';
+  const ticks=4;
+  for(let t=0;t<=ticks;t++){
+    const v = axisMin+range*t/ticks;
+    const y = yPos(v);
+    ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(pad.l+plotW,y); ctx.stroke();
+    ctx.fillText(cfg.yFormat?cfg.yFormat(v):Math.round(v), pad.l-6, y);
+  }
+  ctx.textAlign='center'; ctx.textBaseline='top'; ctx.fillStyle='#8a8370';
+  const xTickEvery = Math.max(1, Math.ceil(n/8));
+  for(let i=0;i<n;i+=xTickEvery){
+    ctx.fillText(cfg.labels[i], xPos(i), pad.t+plotH+6);
+  }
+
+  if(cfg.type==='band'){
+    const {p10,p50,p90} = cfg.band;
+    ctx.beginPath();
+    for(let i=0;i<n;i++){ const y=yPos(p90[i]); i===0?ctx.moveTo(xPos(i),y):ctx.lineTo(xPos(i),y); }
+    for(let i=n-1;i>=0;i--){ const y=yPos(p10[i]); ctx.lineTo(xPos(i),y); }
+    ctx.closePath();
+    ctx.fillStyle=cfg.color+'33'; ctx.fill();
+    ctx.beginPath();
+    for(let i=0;i<n;i++){ const y=yPos(p50[i]); i===0?ctx.moveTo(xPos(i),y):ctx.lineTo(xPos(i),y); }
+    ctx.strokeStyle=cfg.color; ctx.lineWidth=2; ctx.stroke();
+  } else if(cfg.type==='bar'){
+    const groupW = plotW/n;
+    const barW = Math.max(2, groupW*0.6);
+    for(let i=0;i<n;i++){
+      let base=0;
+      const cx=xPos(i);
+      cfg.series.forEach(s=>{
+        const v=Math.max(0,s.values[i]);
+        const y1=yPos(base), y2=yPos(base+v);
+        ctx.fillStyle=s.color;
+        ctx.fillRect(cx-barW/2, y2, barW, Math.max(0,y1-y2));
+        base+=v;
+      });
+    }
+  } else if(cfg.type==='area'){
+    let cum = new Array(n).fill(0);
+    cfg.series.forEach(s=>{
+      ctx.beginPath();
+      for(let i=0;i<n;i++){
+        const y=yPos(cum[i]+Math.max(0,s.values[i]));
+        i===0? ctx.moveTo(xPos(i),y): ctx.lineTo(xPos(i),y);
+      }
+      for(let i=n-1;i>=0;i--) ctx.lineTo(xPos(i), yPos(cum[i]));
+      ctx.closePath();
+      ctx.fillStyle=s.color+'55'; ctx.fill();
+      ctx.strokeStyle=s.color; ctx.lineWidth=1.5; ctx.stroke();
+      for(let i=0;i<n;i++) cum[i]+=Math.max(0,s.values[i]);
+    });
+  } else if(cfg.type==='line'){
+    cfg.series.forEach(s=>{
+      ctx.beginPath();
+      for(let i=0;i<n;i++){
+        const y=yPos(s.values[i]);
+        i===0? ctx.moveTo(xPos(i),y): ctx.lineTo(xPos(i),y);
+      }
+      ctx.strokeStyle=s.color; ctx.lineWidth=2; ctx.stroke();
+      if(s.fill){
+        ctx.lineTo(xPos(n-1), yPos(0)); ctx.lineTo(xPos(0), yPos(0)); ctx.closePath();
+        ctx.fillStyle=s.color+'22'; ctx.fill();
+      }
+    });
+  }
+
+  ctx.font='11px "Noto Sans KR", sans-serif';
+  ctx.textAlign='left'; ctx.textBaseline='middle';
+  let lx = pad.l;
+  const ly = pad.t+plotH+legendH-4;
+  const legendSeries = cfg.type==='band' ? [{label:cfg.bandLabel||'중앙값(10~90% 구간)', color:cfg.color}] : cfg.series;
+  legendSeries.forEach(s=>{
+    ctx.fillStyle=s.color; ctx.fillRect(lx, ly-5, 10, 10);
+    ctx.fillStyle='#4a4438'; ctx.fillText(s.label, lx+14, ly);
+    lx += ctx.measureText(s.label).width+34;
+  });
+}
+function niceMax(v){
+  if(v<=0) return 1;
+  const mag = Math.pow(10, Math.floor(Math.log10(v)));
+  const norm = v/mag;
+  let n;
+  if(norm<=1) n=1; else if(norm<=2) n=2; else if(norm<=5) n=5; else n=10;
+  return n*mag;
+}
+
+function renderResults(inp, results, npStartAge){
+  const opt = results.optimized;
+  const worstKey = Object.keys(results).filter(k=>k!=='optimized').reduce((w,k)=> results[k].totalCost>results[w].totalCost? k:w, 'general_first');
+  const savings = results[worstKey].totalCost - opt.totalCost;
+  const first = opt.rows[0];
+
+  const recoEl = document.getElementById('recoCard');
+  const fb = first.breakdown;
+  const taxParts = [];
+  if(fb.npTax>0) taxParts.push(`국민연금 종합소득세 ${manwon(fb.npTax)}`);
+  if(fb.finTax>0) taxParts.push(`배당소득세 ${manwon(fb.finTax)}`);
+  if(fb.privatePensionTax>0) taxParts.push(`사적연금소득세 ${manwon(fb.privatePensionTax)}`);
+  if(fb.step3OverTax>0) taxParts.push(`한도초과 기타소득세 ${manwon(fb.step3OverTax)}`);
+  if((fb.retireWithinTax+fb.retireOverTax)>0) taxParts.push(`퇴직소득세 ${manwon(fb.retireWithinTax+fb.retireOverTax)}`);
+  const taxPartsText = taxParts.length? taxParts.join(' + ') : '해당 없음';
+
+  const psBreakdownText = first.psW>0 ? ` (비과세원금 ${manwon(first.psNontaxW)} / 과세대상[세액공제원금+운용수익] ${manwon(first.psTaxableW)})` : '';
+  const irpBreakdownParts = [];
+  if(first.irpRetireW>0) irpBreakdownParts.push(`퇴직원금 ${manwon(first.irpRetireW)}`);
+  if(first.irpTaxableW>0) irpBreakdownParts.push(`과세대상[세액공제원금+운용수익] ${manwon(first.irpTaxableW)}`);
+  if(first.irpNontaxW>0) irpBreakdownParts.push(`비과세원금 ${manwon(first.irpNontaxW)}`);
+  const irpBreakdownText = irpBreakdownParts.length? ` (${irpBreakdownParts.join(' / ')})` : '';
+
+  recoEl.innerHTML = `
+    <div class="headline">동적 탐색으로 <b>${LABELS[worstKey]}</b> 전략 대비 평생 세금+건보료를 <strong style="color:#e8c874">${manwon(savings)}</strong> 절감하는 순서 도출!</div>
+    <p>(만 ${inp.curAge}세) 추천 인출: 일반계좌 배당 ${manwon(first.genDividendPart)} · 일반계좌 추가 ${manwon(first.genExtraPart)} · 연금저축 ${manwon(first.psW)}${psBreakdownText} · IRP ${manwon(first.irpW)}${irpBreakdownText}${npStartAge<=inp.curAge? ` · 국민연금 ${manwon(first.npGross)} 수령 중`:` · 국민연금은 만 ${npStartAge}세 개시`}</p>
+    <div class="figs">
+      <div class="fig"><div class="k">예상세금 (지방세 포함)</div><div class="v">${manwon(first.tax)}</div></div>
+      <div class="fig"><div class="k">예상 건보료</div><div class="v">${manwon(first.hi)}</div></div>
+      <div class="fig"><div class="k">국민연금 최적 개시</div><div class="v">만 ${npStartAge}세</div></div>
+    </div>
+    <p style="margin-top:10px;font-size:12.5px;">세금: ${taxPartsText}</p>
+  `;
+
+  renderTimeline(opt.rows, npStartAge);
+  renderAIReport(inp, results, npStartAge, savings, worstKey);
+
+  const ccards = document.getElementById('compareCards');
+  let cardsHtml = '';
+  STRATEGY_ORDER.forEach(k=>{
+    const r = results[k];
+    const isBest = k==='optimized';
+    const status = r.depletedAge ? `<span class="flag warn">${r.depletedAge}세 고갈</span>` : `<span class="flag ok">미고갈</span>`;
+    cardsHtml += `
+      <div class="compare-card${isBest?' best':''}">
+        <div class="cc-head"><span>${LABELS[k]}${isBest?' ★ 최적':''}</span>${status}</div>
+        <div class="cc-row"><span class="cc-k">평생 총 세금</span><span class="cc-v">${manwon(r.totalTax)}</span></div>
+        <div class="cc-row"><span class="cc-k">평생 총 건보료</span><span class="cc-v">${manwon(r.totalHI)}</span></div>
+        <div class="cc-row"><span class="cc-k">최종 잔여자산(${inp.lifeExp}세)</span><span class="cc-v">${eok(r.finalAsset)}</span></div>
+      </div>`;
+  });
+  ccards.innerHTML = cardsHtml;
+  const hiNote = document.getElementById('hiSameNote');
+  if(hiNote){
+    const hiVals = STRATEGY_ORDER.map(k=>Math.round(results[k].totalHI));
+    const allSame = hiVals.every(v=>v===hiVals[0]);
+    hiNote.textContent = allSame
+      ? '※ 건보료는 국민연금(50%)·배당소득만 산정 에 포함되고, 연금저축/IRP은 산정 소득에서 제외되어 전략마다 동일할 수 있음.'
+      : '';
+  }
+
+  const detailRow = document.getElementById('detailStrategyRow');
+  detailRow.innerHTML = '';
+  STRATEGY_ORDER.forEach(k=>{
+    const b = document.createElement('button');
+    b.type='button'; b.className='toggle-btn'+(k===window._selectedDetailStrategy?' active':'');
+    b.textContent = LABELS[k];
+    b.addEventListener('click', ()=>{
+      window._selectedDetailStrategy = k;
+      detailRow.querySelectorAll('.toggle-btn').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');
+      renderDetailTable(window._lastResults[k]);
+    });
+    detailRow.appendChild(b);
+  });
+  renderDetailTable(results[window._selectedDetailStrategy]);
+
+  const ages = opt.rows.map(r=>String(r.age));
+  drawChart(document.getElementById('chartBalance'), {
+    type:'area', stacked:true, height:220, labels:ages,
+    yFormat:v=>(v/100000000).toFixed(1)+'억',
+    series:[
+      {label:'일반계좌', color:'#a6803a', values:opt.rows.map(r=>r.genBal)},
+      {label:'연금저축', color:'#154a41', values:opt.rows.map(r=>r.psBal)},
+      {label:'IRP', color:'#8c3b2e', values:opt.rows.map(r=>r.irpBal)},
+    ]
+  });
+
+  drawChart(document.getElementById('chartCost'), {
+    type:'bar', stacked:true, height:220, labels:ages,
+    yFormat:v=>(v/10000).toLocaleString()+'만',
+    series:[
+      {label:'세금', color:'#8c3b2e', values:opt.rows.map(r=>r.tax)},
+      {label:'건보료', color:'#c79b4c', values:opt.rows.map(r=>r.hi)},
+    ]
+  });
+
+  const worst = results[worstKey];
+  let cumOpt=0, cumWorst=0;
+  const cumRows = opt.rows.map((r,i)=>{
+    const worstRow = worst.rows[i];
+    const optYear = r.tax+r.hi;
+    const worstYear = worstRow? worstRow.tax+worstRow.hi : 0;
+    cumOpt += optYear;
+    cumWorst += worstYear;
+    return { age:r.age, cumOpt, cumWorst, cumSaving: cumWorst-cumOpt };
+  });
+  window._lastCumRows = cumRows;
+  window._lastWorstKey = worstKey;
+  renderCumSavingsTable();
+  document.getElementById('cumSavingsSub').textContent = `동적 최적화가 ${LABELS[worstKey]} 전략 대비 매년 누적으로 얼마나 절감하는지 비교표로 확인합니다.`;
+
+  document.getElementById('disclaimerBox').innerHTML = `⚠️ 시뮬레이터는 의사결정 참고용 도구로, 동적 최적화는 매년 과세 구간 및 건보료 부과 기준에 따른 세금+건보료 합산 지출액을 최소화하는 인출 조합을 찾습니다. 결과는 세율 개정 및 제도변동에 따라 달라질 수 있습니다.`;
+}
+
+function renderCumSavingsTable(){
+  const rows = window._lastCumRows;
+  const worstKey = window._lastWorstKey;
+  const table = document.getElementById('cumSavingsTable');
+  if(!rows || !table) return;
+  let html = `<tr><th>나이</th><th>동적최적화<br>누적비용</th><th>${LABELS[worstKey]}<br>누적비용</th><th>누적절감액</th></tr>`;
+  rows.forEach(r=>{
+    html += `<tr><td>${r.age}세</td><td>${manwon(r.cumOpt)}</td><td>${manwon(r.cumWorst)}</td><td style="color:var(--good);font-weight:600;">${manwon(r.cumSaving)}</td></tr>`;
+  });
+  table.innerHTML = html;
+}
+
+document.getElementById('cumSavingsBtn').addEventListener('click', ()=>{
+  const wrap = document.getElementById('cumSavingsWrap');
+  const btn = document.getElementById('cumSavingsBtn');
+  const showing = wrap.style.display !== 'none';
+  if(showing){
+    wrap.style.display = 'none';
+    btn.textContent = '📊 누적 절감액 비교표 보기';
+  } else {
+    renderCumSavingsTable();
+    wrap.style.display = 'block';
+    btn.textContent = '📊 비교표 닫기';
+  }
+});
+
+function renderTimeline(rows, npStartAge){
+  const container = document.getElementById('timelineContainer');
+  container.innerHTML = '';
+  if(!rows || rows.length===0) return;
+
+  let groups = [];
+  let curr = null;
+
+  rows.forEach(r=>{
+    let mainSources = [];
+    if(r.genDividendPart > 1000000) mainSources.push('일반계좌 배당금');
+    if(r.psW > 1000000) mainSources.push('연금저축');
+    if(r.irpW > 1000000) mainSources.push('IRP');
+    if(r.npGross > 1000000) mainSources.push('국민연금');
+    if(r.genExtraPart > 1000000) mainSources.push('일반계좌 원금');
+    if(mainSources.length===0) mainSources.push('자산 잔액 활용');
+
+    const key = mainSources.join(' + ');
+    if(!curr || curr.key !== key){
+      if(curr) groups.push(curr);
+      curr = { startAge: r.age, endAge: r.age, key, sources: mainSources };
+    } else {
+      curr.endAge = r.age;
+    }
+  });
+  if(curr) groups.push(curr);
+
+  groups.forEach(g=>{
+    const ageLabel = g.startAge === g.endAge ? `${g.startAge}세` : `${g.startAge}세 ~ ${g.endAge}세`;
+    const div = document.createElement('div');
+    div.className = 'timeline-item';
+    div.innerHTML = `<div class="timeline-age">${ageLabel}</div><div class="timeline-desc">주요 인출 출처: <b>${g.key}</b></div>`;
+    container.appendChild(div);
+  });
+}
+
+function renderAIReport(inp, results, npStartAge, savings, worstKey){
+  const box = document.getElementById('aiReportContent');
+  const opt = results.optimized;
+  const first = opt.rows[0];
+
+  let html = `<ul>`;
+  html += `<li><b>일반계좌 배당금 평생 고정 수령:</b> 발생된 월배당금 소득(${manwon(first.genDividendPart)})을 처음부터 평생 고정 현금흐름으로 생활비에 우선 충당합니다.</li>`;
+  html += `<li><b>인출 순서 분리:</b> 일반계좌 원금은 타 연금계좌 자산이 완전 소진된 이후에만 인출되도록 구분하여 관리합니다.</li>`;
+  html += `<li><b>국민연금 개시 연령(만 ${npStartAge}세):</b> 연기 증액(연 7.2%)에 따른 평생 연금액 수령 이익과 건보료 지역가입자 소득포함률(50%)에 따른 부담을 고려할 때 세후 실익이 가장 높은 시점입니다.</li>`;
+  html += `<li><b>연금저축 및 IRP 분산 인출:</b> 세액공제를 받지 않은 비과세 원금을 먼저 활용하고, 사적연금 1,500만원 이하 저율과세(3.3~5.5%) 구간을 적극 활용하여 16.5% 기타소득세 중과세를 방지했습니다.</li>`;
+  if(inp.taxBracketFilling){
+    if(window._bracketFillingUsed){
+      const totalFill = opt.rows.reduce((s,row)=>s+(row.bracketFillAmount||0), 0);
+      html += `<li><b>저율과세 구간 채우기(Tax-Bracket Filling) 적용:</b> 국민연금 개시 전이거나 과세표준이 낮은 해에는 그 해 생활비를 넘더라도 저율과세 한도(연 1,500만원)까지 추가 인출해 세후 현금으로 일반계좌에 옮겨두었습니다. 시뮬레이션 기간 전체 누적 추가 인출액은 <b>${manwon(totalFill)}</b>이며, 미적용 대비 평생 세금·건보료 총액이 더 낮게 계산되어 채택되었습니다.</li>`;
+    } else {
+      html += `<li><b>저율과세 구간 채우기 옵션 검토 — 미적용:</b> 옵션을 켜셨지만, 본 시뮬레이터의 연령별 사적연금 세율(만 70세 미만 5.5% → 80세 이상 3.3%로 <i>나이가 들수록 오히려 낮아짐</i>)을 고려하면 이번 입력값 조합에서는 조기 인출보다 계좌 내에서 계속 굴리다 나중에(또는 향후 한도초과가 실제로 우려될 때만) 인출하는 편이 평생비용이 더 낮게 나와, 채우기를 적용하지 않은 결과를 표시했습니다.</li>`;
+    }
+  }
+  if(inp.extendedRatioSearch){
+    html += `<li><b>계좌별 인출비율 믹스 탐색 적용:</b> 고정된 3가지 인출순서 대신 연금저축:IRP 인출 비율을 10%p 단위(0~100%, 11가지 조합)로 매년 재탐색하여 실제 세후비용이 가장 낮은 조합을 선택했습니다.</li>`;
+  }
+  html += `<li><b>세금 및 건보료 절감 효과:</b> <b>${LABELS[worstKey]}</b> 전략(4개 전략 중 평생 비용이 가장 높은 전략) 대비 평생 <b>${manwon(savings)}</b>의 세금 및 건보료 지출을 줄여 은퇴 자산의 수명을 극대화했습니다.</li>`;
+  html += `<li><b>건보료가 전략별로 동일하게 나오는 이유:</b> 건강보험료는 국민연금(50% 반영)과 배당소득은 산정, 연금저축·IRP는 산정에 포함되지 않습니다. 따라서 인출전략 간 세금 차이는 발생해도 건보료는 동일하게 계산됩니다.</li>`;
+  html += `</ul>`;
+
+  box.innerHTML = html;
+}
+
+function renderDetailTable(sim){
+  window._lastDetailSim = sim;
+  const dtable = document.getElementById('detailTable');
+  const isMonth = window._isMonthView || false;
+
+  let dhtml = `<tr>
+    <th>나이</th>
+    <th>필요생활비</th>
+    <th>국민연금</th>
+    <th>일반(배당금)</th>
+    <th>일반(추가인출)</th>
+    <th>연금저축 인출</th>
+    <th>IRP 인출</th>
+    <th title="생활비로 쓰지 않아도 저율과세 한도(1,500만원)까지 추가 인출해 일반계좌로 옮긴 금액 (연금저축 최우선인출 + 저율과세 구간채우기 합산)">구간채우기 ⓘ</th>
+    <th>세금</th>
+    <th>건보료</th>
+    <th>기말 총자산잔액</th>
+  </tr>`;
+  
+  sim.rows.forEach(row=>{
+    dhtml += `<tr style="cursor:pointer;" title="클릭하여 상세 내역 보기" onclick="openDetailModal(${row.age})">
+      <td><span style="text-decoration:underline;color:var(--ledger);">${row.age}세</span></td>
+      <td>${formatMoney(row.need, isMonth)}</td>
+      <td>${formatMoney(row.npGross, isMonth)}</td>
+      <td>${formatMoney(row.genDividendPart, isMonth)}</td>
+      <td>${formatMoney(row.genExtraPart, isMonth)}</td>
+      <td>${formatMoney(row.psW, isMonth)}</td>
+      <td>${formatMoney(row.irpW, isMonth)}</td>
+      <td>${(row.bracketFillAmount+row.psForceFillAmount)>0? formatMoney(row.bracketFillAmount+row.psForceFillAmount, isMonth) : '-'}</td>
+      <td>${formatMoney(row.tax, isMonth)}</td>
+      <td>${formatMoney(row.hi, isMonth)}</td>
+      <td>${eok(row.totalAsset)}</td>
+    </tr>`;
+  });
+  dtable.innerHTML = dhtml;
+
+  const summaryWrap = document.getElementById('detailSummaryWrap');
+  if(summaryWrap && summaryWrap.style.display !== 'none'){
+    renderDetailSummaryTable();
+  }
+}
+
+function renderDetailSummaryTable(){
+  const stable = document.getElementById('detailSummaryTable');
+  const results = window._lastResults;
+  if(!stable || !results) return;
+
+  const sum = (sim, key)=> sim.rows.reduce((s,row)=>s+(row[key]||0), 0);
+  const sumFill = (sim)=> sim.rows.reduce((s,row)=>s+((row.bracketFillAmount||0)+(row.psForceFillAmount||0)), 0);
+
+  const items = [
+    ['필요생활비', (sim)=>sum(sim,'need')],
+    ['국민연금', (sim)=>sum(sim,'npGross')],
+    ['일반(배당금)', (sim)=>sum(sim,'genDividendPart')],
+    ['일반(추가인출)', (sim)=>sum(sim,'genExtraPart')],
+    ['연금저축 인출', (sim)=>sum(sim,'psW')],
+    ['IRP 인출', (sim)=>sum(sim,'irpW')],
+    ['구간채우기', sumFill],
+    ['세금', (sim)=>sum(sim,'tax')],
+    ['건보료', (sim)=>sum(sim,'hi')],
+  ];
+
+  let shtml = `<tr><th>항목</th>${STRATEGY_ORDER.map(k=>`<th>${LABELS[k]}</th>`).join('')}</tr>`;
+  items.forEach(([label, fn])=>{
+    shtml += `<tr><td>${label}</td>${STRATEGY_ORDER.map(k=>`<td>${manwon(fn(results[k]))}</td>`).join('')}</tr>`;
+  });
+  shtml += `<tr><td style="font-weight:600;color:var(--ledger);">세금+건보료 합계</td>${STRATEGY_ORDER.map(k=>`<td style="font-weight:600;color:var(--ledger);">${manwon(sum(results[k],'tax')+sum(results[k],'hi'))}</td>`).join('')}</tr>`;
+
+  stable.innerHTML = shtml;
+}
+
+document.getElementById('detailSummaryBtn').addEventListener('click', ()=>{
+  const wrap = document.getElementById('detailSummaryWrap');
+  const btn = document.getElementById('detailSummaryBtn');
+  const showing = wrap.style.display !== 'none';
+  if(showing){
+    wrap.style.display = 'none';
+    btn.textContent = '🧮 항목별 합계 보기 (4개 전략 비교)';
+  } else {
+    renderDetailSummaryTable();
+    wrap.style.display = 'block';
+    btn.textContent = '🧮 합계표 닫기';
+  }
+});
+
+let currentModalAge = null;
+function openDetailModal(age){
+  currentModalAge = age;
+  const results = window._lastResults;
+  const strat = window._selectedDetailStrategy;
+  const row = results[strat].rows.find(r=>r.age===age);
+  if(!row) return;
+
+  document.getElementById('modalTitle').textContent = `${age}세 상세 계산 내역 (${LABELS[strat]})`;
+  const b = row.breakdown;
+  let html = `
+    <div class="calc-row"><span>필요 생활비</span><span>${manwon(row.need)}</span></div>
+    <div class="calc-row"><span>국민연금 수령액</span><span>${manwon(row.npGross)}</span></div>
+    <div class="calc-row"><span>일반계좌 배당금 인출</span><span>${manwon(row.genDividendPart)}</span></div>
+    <div class="calc-row"><span>일반계좌 추가 인출</span><span>${manwon(row.genExtraPart)}</span></div>
+    <div class="calc-row"><span>연금저축 인출액</span><span>${manwon(row.psW)}</span></div>
+    <div class="calc-row"><span>&nbsp;&nbsp;- 비과세 원금</span><span>${manwon(row.psNontaxW)}</span></div>
+    <div class="calc-row"><span>&nbsp;&nbsp;- 과세대상(세액공제원금+운용수익)</span><span>${manwon(row.psTaxableW)}</span></div>
+    <div class="calc-row"><span>IRP 인출액</span><span>${manwon(row.irpW)}</span></div>
+    <div class="calc-row"><span>&nbsp;&nbsp;- 퇴직원금(퇴직소득세)</span><span>${manwon(row.irpRetireW)}</span></div>
+    <div class="calc-row"><span>&nbsp;&nbsp;- 과세대상(세액공제원금+운용수익)</span><span>${manwon(row.irpTaxableW)}</span></div>
+    <div class="calc-row"><span>&nbsp;&nbsp;- 비과세 원금</span><span>${manwon(row.irpNontaxW)}</span></div>
+    ${row.psForceFillAmount>0? `<div class="calc-row" style="color:var(--good);"><span>▸ 연금저축 세액공제금액 최우선 강제인출(→일반계좌 이전)</span><span>${manwon(row.psForceFillAmount)}</span></div>`:''}
+    ${row.bracketFillAmount>0? `<div class="calc-row" style="color:var(--good);"><span>▸ 저율과세 구간 채우기(추가 인출→일반계좌 이전)</span><span>${manwon(row.bracketFillAmount)}</span></div>`:''}
+    <div style="margin:10px 0 4px;font-weight:600;color:var(--ledger);">[세부 세금 내역]</div>
+    <div class="calc-row"><span>- 국민연금 종합소득세</span><span>${manwon(b.npTax)}</span></div>
+    <div class="calc-row"><span>- 금융소득세</span><span>${manwon(b.finTax)}</span></div>
+    <div class="calc-row"><span>- 사적연금 소득세</span><span>${manwon(b.privatePensionTax)}</span></div>
+    <div class="calc-row"><span>- 한도초과 기타소득세</span><span>${manwon(b.step3OverTax)}</span></div>
+    <div class="calc-row"><span>- 퇴직소득세</span><span>${manwon(b.retireWithinTax + b.retireOverTax)}</span></div>
+    <div style="margin:10px 0 4px;font-weight:600;color:var(--ledger);">[건강보험료 내역]</div>
+    <div class="calc-row"><span>- 지역건강보험료</span><span>${manwon(b.hiBasic)}</span></div>
+    <div class="calc-row"><span>- 장기요양보험료</span><span>${manwon(b.hiLtc)}</span></div>
+    <div class="calc-row highlight"><span>총 지출액 (세금+건보료)</span><span>${manwon(row.tax + row.hi)}</span></div>
+    <div class="calc-row"><span>연말 총자산 잔액</span><span>${eok(row.totalAsset)}</span></div>
+  `;
+  document.getElementById('modalBody').innerHTML = html;
+  document.getElementById('detailModal').style.display = 'flex';
+}
+
+document.getElementById('modalCloseBtn').addEventListener('click', ()=>{
+  document.getElementById('detailModal').style.display = 'none';
+});
+
+document.getElementById('excelModalBtn').addEventListener('click', ()=>{
+  if(currentModalAge === null) return;
+  const results = window._lastResults;
+  const strat = window._selectedDetailStrategy;
+  const row = results[strat].rows.find(r=>r.age===currentModalAge);
+  if(!row) return;
+
+  const csvRows = [
+    ["항목", "금액(원)"],
+    ["나이", row.age],
+    ["필요생활비", row.need],
+    ["국민연금", row.npGross],
+    ["일반계좌_배당인출", row.genDividendPart],
+    ["일반계좌_추가인출", row.genExtraPart],
+    ["연금저축인출", row.psW],
+    ["연금저축_비과세원금", row.psNontaxW],
+    ["연금저축_과세대상(세액공제원금+운용수익)", row.psTaxableW],
+    ["IRP인출", row.irpW],
+    ["IRP_퇴직원금", row.irpRetireW],
+    ["IRP_과세대상(세액공제원금+운용수익)", row.irpTaxableW],
+    ["IRP_비과세원금", row.irpNontaxW],
+    ["연금저축_세액공제금액_강제우선인출", row.psForceFillAmount || 0],
+    ["저율과세구간채우기_추가인출", row.bracketFillAmount || 0],
+    ["총세금및건보료", row.tax + row.hi],
+    ["기말총자산", row.totalAsset]
+  ];
+  downloadCSV(`은퇴인출_상세_${currentModalAge}세.csv`, csvRows);
+});
+
+function downloadDetailExcel(){
+  const results = window._lastResults;
+  const strat = window._selectedDetailStrategy;
+  if(!results || !results[strat]) return;
+
+  const rows = results[strat].rows;
+  const csvRows = [
+    ["나이", "필요생활비", "국민연금", "일반계좌_배당인출", "일반계좌_추가인출",
+     "연금저축인출", "연금저축_비과세원금", "연금저축_과세대상(세액공제원금+운용수익)",
+     "IRP인출", "IRP_퇴직원금", "IRP_과세대상(세액공제원금+운용수익)", "IRP_비과세원금",
+     "연금저축_세액공제금액_강제우선인출", "저율과세구간채우기_추가인출",
+     "세금", "건보료", "총지출", "기말총자산"]
+  ];
+
+  rows.forEach(r=>{
+    csvRows.push([r.age, r.need, r.npGross, r.genDividendPart, r.genExtraPart,
+      r.psW, r.psNontaxW, r.psTaxableW,
+      r.irpW, r.irpRetireW, r.irpTaxableW, r.irpNontaxW,
+      r.psForceFillAmount || 0, r.bracketFillAmount || 0,
+      r.tax, r.hi, r.tax + r.hi, r.totalAsset]);
+  });
+  downloadCSV(`연도별_인출상세_${LABELS[strat]}.csv`, csvRows);
+}
+
+function downloadCSV(filename, rows){
+  const processRow = row => row.map(val => {
+    let s = String(val !== undefined && val !== null ? val : '');
+    if (s.search(/("|,|\n)/g) >= 0) s = `"${s.replace(/"/g, '""')}"`;
+    return s;
+  }).join(',');
+
+  const csvFile = '\uFEFF' + rows.map(processRow).join('\n');
+  const blob = new Blob([csvFile], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a);
+  a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
+// 인쇄(브라우저 PDF 저장) 시 <details>가 접혀 있으면 내용이 인쇄되지 않으므로,
+// 인쇄 직전에 강제로 펼치고, 인쇄가 끝나면 원래 상태로 복원한다.
+let _detailsReopenedForPrint = [];
+window.addEventListener('beforeprint', ()=>{
+  _detailsReopenedForPrint = [];
+  document.querySelectorAll('details.hi-collapse').forEach(d=>{
+    if(!d.open){
+      d.open = true;
+      _detailsReopenedForPrint.push(d);
+    }
+  });
+});
+window.addEventListener('afterprint', ()=>{
+  _detailsReopenedForPrint.forEach(d=>{ d.open = false; });
+  _detailsReopenedForPrint = [];
+});
+
+function printResultsAsPDF(){
+  // 화면을 이미지로 캡처/변환하는 대신, 브라우저 내장 인쇄 기능을 사용한다.
+  // 인쇄 대화상자에서 "대상: PDF로 저장"을 선택하면, 입력값·계산결과·차트·표를 포함한
+  // 페이지 전체가 A4 용지 레이아웃(위 @media print 스타일 적용)에 맞춰 PDF로 저장된다.
+  const origTitle = document.title;
+  document.title = '은퇴인출_시뮬레이션_결과'; // 브라우저 PDF 저장 시 기본 파일명으로 사용됨
+  window.addEventListener('afterprint', function restoreTitle(){
+    document.title = origTitle;
+    window.removeEventListener('afterprint', restoreTitle);
+  });
+  window.print();
+}
+</script>
+</body>
+</html>
